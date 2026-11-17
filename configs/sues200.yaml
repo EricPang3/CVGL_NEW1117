@@ -1,0 +1,21 @@
+dataset: SUES200
+# AutoDL 可设置 CVGL_DATA_ROOT=/root/autodl-tmp/datasets，无需修改此文件。
+data_root: ~/datasets/SUES200
+direction: D2S
+altitude: 150
+img_size: 384
+epochs: 5
+batch_size: 24
+eval_batch_size: 64
+lr: 0.001
+weight_decay: 0.01
+warmup_epochs: 0.1
+label_smoothing: 0.1
+clip_grad: 100.0
+seed: 1
+workers: 4
+device: cuda:0
+amp: true
+pretrained: true
+gallery_scope: all
+top_k: 10

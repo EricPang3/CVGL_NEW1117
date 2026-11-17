@@ -1,0 +1,3 @@
+# Constraints 不主动安装包；只限制依赖解析。兼容 +cu118 的本地版本号。
+torch==2.1.2
+torchvision==0.16.2

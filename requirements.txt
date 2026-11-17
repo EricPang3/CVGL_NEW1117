@@ -1,0 +1,11 @@
+# AutoDL base: Python 3.10 + PyTorch 2.1.2 + CUDA 11.8。
+# 复用镜像自带的 torch/torchvision，约束防止间接依赖升级框架。
+-c constraints-autodl.txt
+timm==0.9.12
+numpy==1.26.4
+albumentations==1.3.1
+opencv-python-headless==4.8.1.78
+PyYAML==6.0.2
+Pillow==10.4.0
+tqdm==4.66.1
+huggingface-hub==0.36.2
