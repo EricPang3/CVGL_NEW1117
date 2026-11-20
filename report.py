@@ -90,7 +90,7 @@ def build_report(directory, limit=0, compare=None, allow_reranking=False):
         path = record["path"]
         if path not in copied:
             name = hashlib.sha256(path.encode()).hexdigest()[:24] + ".jpg"
-            cached = next((p for p in (source / "images" / name, source / "report/images" / name) if p.is_file()), None)
+            cached = next((p for p in (images / name, source / "images" / name, source / "report/images" / name) if p.is_file()), None)
             if cached:
                 if cached.resolve() != (images / name).resolve():
                     shutil.copy2(cached, images / name)
@@ -137,7 +137,7 @@ def build_report(directory, limit=0, compare=None, allow_reranking=False):
                "cases": cases, "total": len(data["queries"])}
     encoded = json.dumps(payload, ensure_ascii=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
     (report / "index.html").write_text(HTML.replace("__DATA__", encoded), encoding="utf-8")
-    for filename in ("metrics.json", "queries.json", "evaluation.yaml", "training_config.yaml", "config.yaml", "train.csv", "source.zip", "head_train.csv", "fit_config.yaml", "reranking.yaml", "mechanism_analysis.json"):
+    for filename in ("metrics.json", "queries.json", "evaluation.yaml", "training_config.yaml", "config.yaml", "train.csv", "source.zip", "evaluation_source.zip", "head_train.csv", "fit_config.yaml", "reranking.yaml", "mechanism_analysis.json"):
         source = directory / filename
         if source.is_file():
             shutil.copy2(source, report / filename)

@@ -31,12 +31,13 @@ def main():
             continue
         started = time.monotonic()
         name = entry["id"]
+        module, inputs = None, None
         try:
             module, mode, dimension = make_module(name)
             module.to(device).train()
             batch = 24 if device.type == "cuda" else 2
             inputs = torch.randn(batch, 1024, 12, 12, device=device, requires_grad=True)
-            with torch.autocast(device_type=device.type, dtype=torch.float16, enabled=device.type == "cuda"):
+            with torch.autocast(device_type=device.type, dtype=torch.float16 if device.type == "cuda" else torch.bfloat16, enabled=device.type == "cuda"):
                 output = module(inputs)
                 output = output[0] if isinstance(output, tuple) else output
             expected = (batch, dimension) if mode == "parallel" else (batch, 1024, 12, 12)

@@ -70,6 +70,7 @@ def main():
     if state.get("config_sha256", digest) != digest:
         raise RuntimeError("续跑配置与原预注册文件不同；请另建运行名")
     state["config_sha256"] = digest
+    state["expected_archive_tasks"] = (len(config["modules"]) + 1) * len(config["tasks"])
     shutil.copy2(args.config, directory / "protocol.yaml")
     environment = {**os.environ, "CVGL_DATA_ROOT": str(Path(args.data_root).resolve()),
                    "HF_HUB_OFFLINE": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"}
@@ -118,8 +119,13 @@ def main():
     if not preflight.exists() or not json.loads(preflight.read_text()).get("passed"):
         state["active"] = "gpu_preflight"
         save()
-        subprocess.run([sys.executable, "scripts/check_modules.py", "--device", "cuda:0", "--output", str(preflight)],
-                       cwd=ROOT, env=environment, check=True)
+        try:
+            subprocess.run([sys.executable, "scripts/check_modules.py", "--device", "cuda:0", "--output", str(preflight)],
+                           cwd=ROOT, env=environment, check=True)
+        except Exception as error:
+            state.update(status="preflight_failed", error=str(error))
+            save()
+            raise
     for task in config["tasks"]:
         label = "u1652" if task["dataset"] == "U1652" else f'sues200_{task["altitude"]}'
         job = f"baseline_none_{label}"

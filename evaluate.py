@@ -8,7 +8,7 @@ from pathlib import Path
 
 from sample4geo.evaluate import evaluate
 from sample4geo.model import MODEL_NAME, TimmModel, load_model_state
-from sample4geo.utils import configure, experiment_config, load_weights, save_config, save_json, setup
+from sample4geo.utils import configure, experiment_config, load_weights, save_config, save_json, setup, snapshot_source
 
 
 def main():
@@ -63,6 +63,8 @@ def main():
     config.update({"model": MODEL_NAME, "checkpoint": str(checkpoint),
                    "checkpoint_sha256": file_hash(checkpoint), "checkpoint_metadata": bool(saved),
                    "evaluated_at": datetime.now().astimezone().isoformat()})
+    evaluation_code = snapshot_source(output, "evaluation_source.zip")
+    config.update(evaluation_source_sha256=evaluation_code["source_sha256"], evaluation_git_commit=evaluation_code["git_commit"])
     metrics, queries = evaluate(model, config, device)
     queries["evaluation"] = config
     metrics["checkpoint_sha256"] = config["checkpoint_sha256"]
@@ -83,6 +85,7 @@ def main():
 
 
 def file_hash(path):
+    path = Path(path)
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):

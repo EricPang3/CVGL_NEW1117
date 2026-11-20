@@ -293,5 +293,15 @@
     "path": "models/aggregators/aggregation.py",
     "url": "https://raw.githubusercontent.com/Ahmedest61/VLAD-BuFF/main/models/aggregators/aggregation.py",
     "sha256": "0cace373afc505f2474d15562db89ec339ebf7fb3a6abbeb9e867129337a8a19"
+  },
+  "se": {
+    "repo": "pytorch/vision",
+    "branch": "v0.16.2",
+    "url": "https://github.com/pytorch/vision/blob/v0.16.2/torchvision/ops/misc.py",
+    "license": "BSD-3-Clause",
+    "implementation": "installed torchvision.ops.SqueezeExcitation",
+    "version": "0.16.2+cpu",
+    "sha256": "c2a197cf23272e103a66b7d692b753758e5e8d79e2ccbdbcf7813c0e01c6a249",
+    "hash_scope": "inspect.getsource(SqueezeExcitation)"
   }
 }

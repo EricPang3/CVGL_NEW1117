@@ -46,16 +46,18 @@ def records_hash(records):
     return hashlib.sha256(json.dumps(manifest, ensure_ascii=False).encode()).hexdigest()
 
 
-def snapshot_source(output):
+def snapshot_source(output, filename="source.zip"):
     files = [*ROOT.glob("*.py"), *ROOT.glob("*.txt"), *ROOT.glob("*.md"), *ROOT.glob("configs/*.yaml"),
              *ROOT.glob("sample4geo/**/*.py"), *ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py"),
              *[p for p in (ROOT / "third_party").rglob("*") if p.is_file() and "__pycache__" not in p.parts]]
-    with zipfile.ZipFile(output / "source.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output / filename, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(files):
             archive.write(path, path.relative_to(ROOT))
     git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True) if (ROOT / ".git").exists() else None
-    return {"source_sha256": hashlib.sha256((output / "source.zip").read_bytes()).hexdigest(),
-            "git_commit": git.stdout.strip() if git and git.returncode == 0 else None}
+    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True) if git else None
+    return {"source_sha256": hashlib.sha256((output / filename).read_bytes()).hexdigest(),
+            "git_commit": git.stdout.strip() if git and git.returncode == 0 else None,
+            "git_dirty": bool(dirty.stdout.strip()) if dirty else None}
 
 
 def configure(config, args):

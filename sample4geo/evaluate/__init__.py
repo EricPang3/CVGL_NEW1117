@@ -74,6 +74,7 @@ def evaluate(model, config, device):
     metrics.update({"query_count": len(queries), "query_places": len(query_ids),
                     "descriptor_dim": q_features.shape[1],
                     "extra_parameters": sum(p.numel() for n, p in model.named_parameters() if n.startswith(("feature_module.", "parallel_projection.", "module_scale"))),
+                    "extra_trainable_parameters": sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and n.startswith(("feature_module.", "parallel_projection.", "module_scale"))),
                     "feature_extraction_seconds": extracted_at - started,
                     "ranking_seconds": time.perf_counter() - extracted_at,
                     "evaluation_seconds": time.perf_counter() - started,

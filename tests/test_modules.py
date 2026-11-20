@@ -96,3 +96,16 @@ class ModuleTests(unittest.TestCase):
         score.sum().backward()
         self.assertTrue(torch.isfinite(final).all())
         self.assertTrue(any(p.grad is not None and p.grad.abs().sum() > 0 for p in head.parameters()))
+
+    def test_reparameterization_preserves_outputs_after_bn_updates(self):
+        from scripts.check_reparameterization import fused_copy
+        for name in ("acb", "repvgg_block", "uni_replk"):
+            with self.subTest(module=name):
+                module, _, _ = make_module(name)
+                with torch.no_grad():
+                    module.train()
+                    module(torch.randn(2,1024,12,12))
+                    module(torch.randn(2,1024,12,12))
+                    module.eval()
+                    x = torch.randn(2,1024,12,12)
+                    self.assertTrue(torch.allclose(module(x),fused_copy(module)(x),atol=1e-4,rtol=1e-4))

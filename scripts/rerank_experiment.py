@@ -93,7 +93,7 @@ def fit(args, model, config, device):
                     labels = (indices % 2 == 0).float().to(device)
                     target = torch.where(indices % 2 == 0, positive[anchor], negative[anchor])
                     optimizer.zero_grad(set_to_none=True)
-                    with torch.autocast(device_type=device.type, enabled=device.type == "cuda", dtype=torch.float16):
+                    with torch.autocast(device_type=device.type, enabled=device.type == "cuda", dtype=torch.float16 if device.type == "cuda" else torch.bfloat16):
                         local, final = head(dg[anchor].to(device), dl[anchor].float().to(device),
                                             sg[target].to(device), sl[target].float().to(device))
                     loss = F.binary_cross_entropy(local.float(), labels) + F.binary_cross_entropy(final.float().clamp(1e-6, 1 - 1e-6), labels)
@@ -144,7 +144,7 @@ def evaluate_reranker(args, model, config, device):
     gallery_ids = np.array([r["id"] for r in gallery])
     results, rerank_seconds = [], 0.0
     for start in tqdm(range(0, len(queries), 64), desc="Fixed-budget Top-K reranking"):
-        scores = (qg[start:start + 64].to(device) @ gg.to(device).T).cpu().numpy()
+        scores = (qg[start:start + 64].to(device) @ reranker.gglobal.T).cpu().numpy()
         tick = time.perf_counter()
         orders, _ = reranker.rank(start, scores)
         torch.cuda.synchronize(device) if device.type == "cuda" else None

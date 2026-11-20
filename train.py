@@ -70,6 +70,7 @@ def main():
     config["parameters"] = sum(p.numel() for p in model.parameters())
     config["trainable_parameters"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
     config["extra_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
+    config["extra_trainable_parameters"] = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
     if config["dataset"] == "SUES200":
         config["split_sha256"] = hashlib.sha256((ROOT / "configs/sues200_split.yaml").read_bytes()).hexdigest()
     dataset = U1652DatasetTrain(satellite, drone, get_transforms(config, training=True))
