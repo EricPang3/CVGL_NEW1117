@@ -77,3 +77,14 @@ def load_model_state(model, state, initialize_module=False):
     if unexpected or any(not key.startswith(allowed) for key in missing):
         raise RuntimeError(f"权重结构不匹配：missing={missing}, unexpected={unexpected}")
     return missing
+
+
+def module_alpha_metadata(model, override=None):
+    if not hasattr(model, "module_scale"):
+        return {}
+    if override is not None:
+        if not math.isfinite(override):
+            raise ValueError("module-alpha必须是有限数")
+        with torch.no_grad():
+            model.module_scale.fill_(override)
+    return {"module_alpha_effective": model.module_scale.detach().item(), "module_alpha_overridden": override is not None}

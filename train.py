@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from sample4geo.dataset import U1652DatasetTrain, UniqueBatchSampler, build_records, get_transforms
 from sample4geo.loss import InfoNCE
-from sample4geo.model import MODEL_NAME, TimmModel, load_model_state
+from sample4geo.model import MODEL_NAME, TimmModel, load_model_state, module_alpha_metadata
 from sample4geo.trainer import cosine_scheduler, train_epoch
 from sample4geo.utils import ROOT, configure, experiment_config, load_weights, new_output, records_hash, save_config, setup, snapshot_source
 
@@ -47,6 +47,7 @@ def main():
         state, _ = load_weights(args.init_checkpoint)
         load_model_state(model, state, initialize_module=config["module"] != "none")
         del state
+    config.update(module_alpha_metadata(model, args.module_alpha))
     data = model.data_config()
     config.update({"model": MODEL_NAME, "pool": "avg", "shared_encoder": True,
                    "mean": list(data["mean"]), "std": list(data["std"]),

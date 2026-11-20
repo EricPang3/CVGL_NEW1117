@@ -7,6 +7,7 @@
 - GCBlock/CAA的mmcv初始化和Conv/BN/SiLU接口由`compat.py`提供，CAA使用PyTorch原生初始化；不安装整个mmcv/mmengine。
 - WTConv保留作者实现，wavelet helper仅支持本轮注册的db1/Haar闭式滤波器，省去PyWavelets；不声称支持其他小波。
 - GRN转BHWC再转回；PAM经128通道投影，并保留其零增量初始化；iSQRT-COV显式FP32，展平作者返回的尾部单维。
+- SelfNorm统计与GeM幂运算显式FP32，避免FP16下方差eps消失或幂溢出；新模块的空间输出再按原特征dtype送回原head。
 - ACB、RepVGG、SRE使用1024→128→1024适配瓶颈；UniRepLK使用普通PyTorch卷积回退。缩小参数在实际配置、代码与参数计数中留痕。
 - BoQ投影128、8queries、1layer、row_dim2；SALAD为8clusters/32cluster_dim/128token_dim；EDT沿用作者SA_CA并缩小查询/解码维度。所有并行分支保留原GAP。
 - SE直接复用安装的torchvision 0.16.2 SqueezeExcitation（BSD-3-Clause），不复制另一套实现。

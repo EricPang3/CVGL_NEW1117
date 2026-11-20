@@ -98,3 +98,5 @@ python -m unittest discover -s tests -v
 先读不可修改的[核心思想](核心思想（AI必读）.md)及[工作记录](EXPERIMENT_LOG.md)。`--module none`严格保留原模型；`--module eca`等显式开关启用共享适配层。固定配方见`configs/module_suite.yaml`，服务器由`python scripts/module_suite.py`按序续跑全部33模块和4个对照。三种Top-K方法单列，不能将适配配置称为原论文完整复现。
 
 每次命令、源码、权重、配置与结果分别留存；本地`outputs/modules20261120/index.html`展示累积真实指标与案例链接。详见工作记录中的归档规则。
+
+融合系数初值在训练配置，结尾值在train.csv，评估实际值在evaluation.yaml。`--module-alpha 0`关闭的是当前权重的模块旁路，不能冒充独立训练的none基线。SelfNorm统计、GeM幂与二阶矩阵运算保持FP32兼容AMP。

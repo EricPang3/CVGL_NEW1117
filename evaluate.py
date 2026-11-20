@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sample4geo.evaluate import evaluate
-from sample4geo.model import MODEL_NAME, TimmModel, load_model_state
+from sample4geo.model import MODEL_NAME, TimmModel, load_model_state, module_alpha_metadata
 from sample4geo.utils import configure, experiment_config, load_weights, save_config, save_json, setup, snapshot_source
 
 
@@ -50,6 +50,7 @@ def main():
     options = {} if config["module"] == "none" else dict(module=config["module"], module_alpha=config["module_alpha"])
     model = TimmModel(pretrained=False, **options)
     load_model_state(model, state, initialize_module=config["module"] == "burst_gap" and saved.get("module", "none") == "none")
+    config.update(module_alpha_metadata(model, args.module_alpha))
     del state
     data = model.data_config()
     config.setdefault("mean", list(data["mean"]))

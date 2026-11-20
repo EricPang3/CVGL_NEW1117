@@ -14,14 +14,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REMOTE_POLL = r'''
-import json,sys
+import json,sys,hashlib
 from pathlib import Path
+import yaml
 name=sys.argv[1]
 if Path(name).name!=name:raise RuntimeError('非法运行名')
 p=Path('/root/autodl-tmp/CVGL_NEW/outputs')/name
 state=json.loads((p/'state.json').read_text()) if (p/'state.json').exists() else {'status':'not_started'}
 ready=[json.loads(f.read_text()) for f in sorted((p/'archive_ready').glob('*.json'))]
-print(json.dumps({'state':state,'ready':ready}))
+logs=[]
+terminal=state.get('status') in ('complete','partial_failure')
+paths=[(f,f.name,state.get('jobs',{}).get(f.stem,{}).get('status') in ('complete','failed') or terminal) for f in p.glob('*.log')]
+protocol=yaml.safe_load((p/'protocol.yaml').read_text()) if (p/'protocol.yaml').exists() else {}
+baseline=p.parent/protocol.get('baseline_run','matrix20261120_none')
+if (baseline/'run.log').exists():paths.append((baseline/'run.log','baseline_run.log',True))
+launcher=p.parent/(name+'.launch.log')
+if launcher.exists():paths.append((launcher,'suite_launcher.log',terminal))
+for f,label,complete in paths:
+ info=f.stat();logs.append({'path':str(f),'name':label,'size':info.st_size,'mtime':info.st_mtime_ns,'sha256':hashlib.sha256(f.read_bytes()).hexdigest() if complete else None})
+print(json.dumps({'state':state,'ready':ready,'logs':logs}))
 '''
 
 REMOTE_ACK = r'''
@@ -31,6 +42,7 @@ a=json.loads(sys.argv[1]);root=Path('/root/autodl-tmp/CVGL_NEW/outputs');p=Path(
 if p.parent!=root or not (p.name.startswith(a['run']+'_') or a.get('retain_remote')):raise RuntimeError('归档路径不在本批次')
 if a.get('archive_checkpoint'):
  w=Path(a['checkpoint'])
+ if w.resolve().parent!=p:raise RuntimeError('权重路径不在当前实验目录')
  if w.exists():
   h=hashlib.sha256()
   with w.open('rb') as stream:
@@ -165,6 +177,20 @@ def main():
                 dashboard(directory, remote, manifest)
                 print("archived", job, flush=True)
             dashboard(directory, remote, manifest)
+            logs_dir = directory / "logs"
+            logs_dir.mkdir(exist_ok=True)
+            known_logs = manifest.setdefault("logs", {})
+            for record in polled.get("logs", []):
+                name = record["name"]
+                if Path(name).name != name:
+                    raise RuntimeError("非法日志名")
+                target = logs_dir / name
+                if known_logs.get(name) != record or not target.exists():
+                    download(record["path"], target)
+                    if record["sha256"] and file_hash(target) != record["sha256"]:
+                        raise RuntimeError(f"日志写入中，下一轮重试：{name}")
+                    known_logs[name] = record
+                    save(manifest_file, manifest)
             if remote.get("status") in ("complete", "partial_failure"):
                 manifest["status"] = remote["status"]
                 save(manifest_file, manifest)

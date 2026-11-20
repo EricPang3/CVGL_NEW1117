@@ -6,7 +6,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from sample4geo.model import TimmModel, load_model_state
+from sample4geo.model import TimmModel, load_model_state, module_alpha_metadata
 from sample4geo.module_adapters import component
 from sample4geo.modules import make_module
 from sample4geo.utils import ROOT, read_config
@@ -109,3 +109,20 @@ class ModuleTests(unittest.TestCase):
                     module.eval()
                     x = torch.randn(2,1024,12,12)
                     self.assertTrue(torch.allclose(module(x),fused_copy(module)(x),atol=1e-4,rtol=1e-4))
+
+    def test_selfnorm_constant_half_precision_features_remain_finite(self):
+        module, _, _ = make_module("selfnorm")
+        features = torch.ones(2,1024,12,12,dtype=torch.float16,requires_grad=True)
+        output = module(features)
+        self.assertEqual(output.dtype,torch.float32)
+        output.mean().backward()
+        self.assertTrue(torch.isfinite(output).all())
+        self.assertTrue(torch.isfinite(features.grad).all())
+
+    def test_explicit_alpha_override_wins_over_loaded_parameter(self):
+        model=torch.nn.Module()
+        model.module_scale=torch.nn.Parameter(torch.tensor(.3))
+        metadata=module_alpha_metadata(model,0.)
+        self.assertEqual(model.module_scale.item(),0.)
+        self.assertEqual(metadata["module_alpha_effective"],0.)
+        self.assertTrue(metadata["module_alpha_overridden"])
