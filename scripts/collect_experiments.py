@@ -23,7 +23,7 @@ p=Path('/root/autodl-tmp/CVGL_NEW/outputs')/name
 state=json.loads((p/'state.json').read_text()) if (p/'state.json').exists() else {'status':'not_started'}
 ready=[json.loads(f.read_text()) for f in sorted((p/'archive_ready').glob('*.json'))]
 logs=[]
-terminal=state.get('status') in ('complete','partial_failure')
+terminal=state.get('status') in ('complete','partial_failure','budget_reached')
 paths=[(f,f.name,state.get('jobs',{}).get(f.stem,{}).get('status') in ('complete','failed') or terminal) for f in p.glob('*.log')]
 protocol=yaml.safe_load((p/'protocol.yaml').read_text()) if (p/'protocol.yaml').exists() else {}
 baseline=p.parent/protocol.get('baseline_run','matrix20261120_none')
@@ -32,7 +32,8 @@ launcher=p.parent/(name+'.launch.log')
 if launcher.exists():paths.append((launcher,'suite_launcher.log',terminal))
 for f,label,complete in paths:
  info=f.stat();logs.append({'path':str(f),'name':label,'size':info.st_size,'mtime':info.st_mtime_ns,'sha256':hashlib.sha256(f.read_bytes()).hexdigest() if complete else None})
-print(json.dumps({'state':state,'ready':ready,'logs':logs}))
+summary=[n for n in ('commands.jsonl','metrics.csv','protocol.yaml','gpu_preflight.json') if (p/n).is_file()]
+print(json.dumps({'state':state,'ready':ready,'logs':logs,'summary_files':summary}))
 '''
 
 REMOTE_ACK = r'''
@@ -91,7 +92,7 @@ def dashboard(directory, remote, manifest):
     status = html.escape(str(remote.get("status")))
     active = html.escape(str(remote.get("active", "")))
     page = '<!doctype html><meta charset="utf-8"><title>33模块实验总览</title><style>body{font-family:system-ui;padding:24px;color:#243543}table{border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}input{padding:10px;width:350px}a{color:#176b75}</style>'
-    page += f'<h1>33模块实验总览</h1><p>状态：{status}；当前：{active}</p><p>真实评估 {len(results)}/370；本地已归档 {len(manifest["artifacts"])}/190 个任务。点击已归档模块看案例；分数为百分比，差值为百分点。</p>'
+    page += f'<h1>33模块实验总览</h1><p>运行：{html.escape(directory.name)}；seed：{remote.get("seed", 1)}；状态：{status}；当前：{active}</p><p>真实评估 {len(results)}/370；本地已归档 {len(manifest["artifacts"])}/{remote.get("expected_archive_tasks", 190)} 个任务。点击已归档模块看案例；分数为百分比，差值为百分点。</p>'
     page += '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重在artifacts/任务/model.pth；冻结或重排方法复用baseline_none对应权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>'
     page += '<input placeholder="筛选模块、数据集或方向" oninput="for(const r of document.querySelectorAll(\'tbody tr\'))r.hidden=!r.textContent.toLowerCase().includes(this.value.toLowerCase())">'
     page += '<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('模块','类型','数据集','高度','方向','R@1','AP','ΔR@1','ΔAP','修好','退步','额外参数'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
@@ -99,7 +100,7 @@ def dashboard(directory, remote, manifest):
     (directory / "index.html").write_text(page, encoding="utf-8")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, required=True)
@@ -107,7 +108,7 @@ def main():
     parser.add_argument("--socket", default="/tmp/cvgl-ssh-22352")
     parser.add_argument("--interval", type=int, default=30)
     parser.add_argument("--shutdown-when-complete", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if Path(args.run).name != args.run:
         parser.error("run必须是单个目录名")
     directory = ROOT / "outputs" / args.run
@@ -191,13 +192,14 @@ def main():
                         raise RuntimeError(f"日志写入中，下一轮重试：{name}")
                     known_logs[name] = record
                     save(manifest_file, manifest)
-            if remote.get("status") in ("complete", "partial_failure"):
+            if remote.get("status") in ("complete", "partial_failure", "budget_reached"):
                 manifest["status"] = remote["status"]
+                manifest["expected_archive_tasks"] = remote.get("expected_archive_tasks", 190)
                 save(manifest_file, manifest)
                 # 所有ready任务已经校验归档；保存完整命令和汇总后才能关机。
-                for name in ("commands.jsonl", "metrics.csv", "protocol.yaml", "gpu_preflight.json"):
+                for name in polled["summary_files"]:
                     download(f"/root/autodl-tmp/CVGL_NEW/outputs/{args.run}/{name}", directory / name)
-                if remote["status"] == "complete" and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 190):
+                if remote["status"] in ("complete", "budget_reached") and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 190):
                     if args.shutdown_when_complete:
                         subprocess.run([*ssh, "/bin/bash /usr/bin/shutdown"], check=True, timeout=120)
                         manifest["shutdown"] = "requested_after_verified_local_archive"

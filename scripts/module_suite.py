@@ -15,6 +15,11 @@ from pathlib import Path
 
 import yaml
 
+try:
+    from scripts.experiment_budget import budget_expired, parse_deadline
+except ModuleNotFoundError:
+    from experiment_budget import budget_expired, parse_deadline
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -59,6 +64,7 @@ def main():
     args = parser.parse_args()
     config_bytes = Path(args.config).read_bytes()
     config = yaml.safe_load(config_bytes)
+    deadline = parse_deadline(config.get("stop_starting_at"))
     directory = ROOT / "outputs" / config["run"]
     directory.mkdir(parents=True, exist_ok=True)
     archive_ready = directory / "archive_ready"
@@ -71,6 +77,8 @@ def main():
         raise RuntimeError("续跑配置与原预注册文件不同；请另建运行名")
     state["config_sha256"] = digest
     state["expected_archive_tasks"] = (len(config["modules"]) + 1) * len(config["tasks"])
+    state["planned_archive_tasks"] = state["expected_archive_tasks"]
+    state["seed"] = config["seed"]
     shutil.copy2(args.config, directory / "protocol.yaml")
     environment = {**os.environ, "CVGL_DATA_ROOT": str(Path(args.data_root).resolve()),
                    "HF_HUB_OFFLINE": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"}
@@ -101,10 +109,21 @@ def main():
         record.setdefault("completed", []).append(phase)
         save()
 
+    def stop_at_budget():
+        if not budget_expired(deadline):
+            return False
+        failures = [k for k, v in state["jobs"].items() if v.get("status") == "failed"]
+        state.update(status="partial_failure" if failures else "budget_reached", failures=failures,
+                     active=None, finished_at=now(), stop_starting_at=deadline.isoformat(),
+                     expected_archive_tasks=len(list(archive_ready.glob("*.json"))))
+        save()
+        print("budget boundary: completed tasks preserved", flush=True)
+        return True
+
     baseline_state = ROOT / "outputs" / config["baseline_run"] / "run.json"
     state["status"] = "waiting_baseline"
     save()
-    while True:
+    while not config.get("bootstrap_baseline", False):
         baseline = json.loads(baseline_state.read_text()) if baseline_state.exists() else {}
         if baseline.get("status") == "complete":
             break
@@ -126,6 +145,46 @@ def main():
             state.update(status="preflight_failed", error=str(error))
             save()
             raise
+    if config.get("bootstrap_baseline", False):
+        # 每个新seed先独立训练GAP基线；模块只与相同seed的基线比较。
+        for task in config["tasks"]:
+            label = "u1652" if task["dataset"] == "U1652" else f'sues200_{task["altitude"]}'
+            job = f"baseline_none_{label}"
+            record = state["jobs"].setdefault(job, {"module": "none", **task, "completed": []})
+            if record.get("status") == "complete":
+                continue
+            if stop_at_budget():
+                return
+            model_dir = ROOT / "outputs" / f'{config["baseline_run"]}_{label}'
+            try:
+                if "train" not in record["completed"] and model_dir.exists():
+                    attempt = 1
+                    while model_dir.with_name(model_dir.name + f"_failed_attempt{attempt}").exists():
+                        attempt += 1
+                    model_dir.rename(model_dir.with_name(model_dir.name + f"_failed_attempt{attempt}"))
+                command = ["train.py", "--dataset", task["dataset"], "--name", model_dir.name,
+                           "--module", "none", "--epochs", str(config["epochs"]),
+                           "--batch-size", str(config["batch_size"]), "--seed", str(config["seed"])]
+                if task["altitude"]:
+                    command += ["--altitude", str(task["altitude"])]
+                run(job, "train", command)
+                for direction in config["directions"]:
+                    output = model_dir / direction
+                    run(job, f"evaluate_{direction}", ["evaluate.py", "--checkpoint", str(model_dir / "model.pth"),
+                        "--direction", direction, "--output", str(output), "--gallery-scope", config["gallery_scope"],
+                        "--top-k", str(config["top_k"]), "--overwrite"])
+                    run(job, f"report_{direction}", ["report.py", "--experiment", str(output),
+                        "--limit", str(config["report_limit"])])
+                bundle = prepare_archive(directory, model_dir, model_dir / "model.pth", job, True, retain_remote=True)
+                record.update(status="complete", completed_at=now(), artifact=str(bundle))
+            except Exception as error:
+                record.update(status="failed", error=str(error), failed_at=now())
+                state["events"].append({"at": now(), "job": job, "error": str(error)})
+                state.update(status="partial_failure", failures=[job], active=None,
+                             expected_archive_tasks=len(list(archive_ready.glob("*.json"))))
+                save()
+                raise
+            save()
     for task in config["tasks"]:
         label = "u1652" if task["dataset"] == "U1652" else f'sues200_{task["altitude"]}'
         job = f"baseline_none_{label}"
@@ -139,11 +198,15 @@ def main():
             record = state["jobs"].setdefault(job, {"module": module["id"], **task, "completed": []})
             if record.get("status") == "complete":
                 continue
+            if stop_at_budget():
+                return
             # 接收端成功归档后会释放模型副本；空间不足时暂停，绝不删除未校验产物。
             while shutil.disk_usage(ROOT / "outputs").free < 3 * 2**30:
                 state["status"] = "waiting_archive_space"
                 save()
                 time.sleep(30)
+            if stop_at_budget():
+                return
             state["status"] = "running"
             base = ROOT / "outputs" / f'{config["baseline_run"]}_{label}'
             model_dir = ROOT / "outputs" / f'{config["run"]}_{job}'
