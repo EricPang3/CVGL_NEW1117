@@ -1,4 +1,4 @@
-"""沿用原项目 Albumentations 1.x 的增强与两路同步翻转约定。"""
+"""U1652 沿用 S4G；SUES 默认采用 CAMP/DAC 的颜色增强。"""
 
 import albumentations as A
 import cv2
@@ -13,10 +13,12 @@ def get_transforms(config, training=False):
         return A.Compose([resize, *normalize])
 
     def train(satellite):
+        extended = config.get("augmentation", "s4g") == "camp"
         return A.Compose([
             A.ImageCompression(quality_lower=90, quality_upper=100, p=0.5),
             A.Resize(size, size, interpolation=cv2.INTER_LINEAR_EXACT),
-            A.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.15, p=0.5),
+            A.ColorJitter(brightness=0.15, contrast=(0.3 if satellite else 0.7) if extended else 0.15,
+                          saturation=0.3 if extended else 0.15, hue=0.3 if extended else 0.15, p=0.5),
             A.OneOf([A.AdvancedBlur(p=1), A.Sharpen(p=1)], p=0.3),
             A.OneOf([
                 A.GridDropout(ratio=0.4, p=1),

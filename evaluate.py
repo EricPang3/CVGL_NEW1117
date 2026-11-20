@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -62,6 +63,12 @@ def main():
     save_json(metrics, output / "metrics.json")
     # 原训练配置保持可追溯；独立保存本次实际评估参数。
     save_config(config, output / "evaluation.yaml")
+    if saved:
+        save_config(saved, output / "training_config.yaml")
+    for filename in ("train.csv", "source.zip"):
+        source = checkpoint.parent / filename
+        if source.is_file() and source.resolve() != (output / filename).resolve():
+            shutil.copy2(source, output / filename)
     if not (output / "config.yaml").exists():
         save_config(config, output / "config.yaml")
     print(" - ".join(f"{key}: {metrics[key] * 100:.2f}%" for key in ("recall@1", "recall@5", "recall@10", "recall@1%", "mAP")))

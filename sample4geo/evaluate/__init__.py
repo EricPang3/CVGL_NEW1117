@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from ..dataset import U1652DatasetEval, build_records, get_transforms
 from .metrics import score_query, summarize
+from ..utils import records_hash
 
 
 @torch.no_grad()
@@ -53,12 +54,15 @@ def evaluate(model, config, device):
 
             detail["top_k"] = [candidate(i) for i in detail.pop("top_indices")]
             detail["best_positive"] = candidate(detail.pop("best_positive_index"))
+            detail["best_negative"] = candidate(detail.pop("best_negative_index"))
             results.append({**query, **detail})
     metrics = summarize(results, len(gallery))
     metrics.update({"query_count": len(queries), "query_places": len(query_ids),
                     "gallery_raw_count": len(raw_gallery), "gallery_count": len(gallery),
                     "gallery_raw_places": len({r["id"] for r in raw_gallery}),
                     "gallery_places": len(set(gallery_ids)),
+                    "query_manifest_sha256": records_hash(queries),
+                    "gallery_manifest_sha256": records_hash(gallery),
                     "protocol": {"version": "cvgl_new_v1", "gallery_scope": config["gallery_scope"],
                                  "similarity": "cosine_fp32", "normalized_features": True,
                                  "ap": "s4g_trapezoid", "recall_1_percent_k": max(1, int(np.ceil(len(gallery) / 100))),

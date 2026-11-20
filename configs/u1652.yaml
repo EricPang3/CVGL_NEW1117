@@ -1,12 +1,12 @@
 dataset: U1652
-# AutoDL 可设置 CVGL_DATA_ROOT=/root/autodl-tmp/datasets，无需修改此文件。
+# 当前 AutoDL：export CVGL_DATA_ROOT=/root/autodl-tmp/CVGL_NEW/data
 data_root: ~/datasets/U1652
 direction: D2S
 altitude: null
 img_size: 384
-epochs: 5
+epochs: 1
 batch_size: 24
-eval_batch_size: 64
+eval_batch_size: 128
 lr: 0.001
 weight_decay: 0.01
 warmup_epochs: 0.1
@@ -16,6 +16,8 @@ seed: 1
 workers: 4
 device: cuda:0
 amp: true
+amp_init_scale: 1024
+augmentation: s4g
 pretrained: true
-gallery_scope: all
+gallery_scope: query_ids
 top_k: 10

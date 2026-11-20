@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import random
 from datetime import datetime
@@ -37,9 +38,15 @@ def save_json(data, path):
     Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
 
 
+def records_hash(records):
+    """相对路径和地点的指纹；跨机器一致，不代表图片内容哈希。"""
+    manifest = sorted((r["key"], r["id"]) for r in records)
+    return hashlib.sha256(json.dumps(manifest, ensure_ascii=False).encode()).hexdigest()
+
+
 def configure(config, args):
     for key in ("direction", "altitude", "data_root", "device", "workers", "img_size",
-                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k"):
+                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation"):
         value = getattr(args, key, None)
         if value is not None:
             config[key] = value
@@ -57,6 +64,11 @@ def configure(config, args):
         config["altitude"] = None
     if config["gallery_scope"] not in ("all", "query_ids"):
         raise ValueError("gallery_scope 必须是 all 或 query_ids")
+    # 旧 checkpoint 未记录这些字段；训练历史仍由原 checkpoint/config 保留。
+    config.setdefault("augmentation", "s4g")
+    config.setdefault("amp_init_scale", 1024)
+    if config["augmentation"] not in ("s4g", "camp") or config["amp_init_scale"] <= 0:
+        raise ValueError("augmentation 必须为 s4g/camp，amp_init_scale 必须大于 0")
     for key in ("img_size", "batch_size", "eval_batch_size", "epochs", "top_k"):
         if config[key] < 1:
             raise ValueError(f"{key} 必须大于 0")
