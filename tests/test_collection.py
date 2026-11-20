@@ -8,10 +8,26 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.collect_experiments import REMOTE_ACK, REMOTE_POLL
+from scripts.collect_experiments import REMOTE_ACK, REMOTE_POLL, begin_revision
 
 
 class CollectionTests(unittest.TestCase):
+    def test_retrained_artifact_preserves_previous_weights(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);target=root/'artifacts/pam_u1652';target.mkdir(parents=True)
+            (target/'model.pth').write_bytes(b'old valid checkpoint')
+            previous={'job':'pam_u1652','bundle_sha256':'a'*64,'checkpoint_sha256':'1'*64,'local_directory':str(target)}
+            manifest={'artifacts':{'pam_u1652':previous}}
+            self.assertFalse(begin_revision(root,manifest,previous))
+            updated={**previous,'bundle_sha256':'b'*64,'checkpoint_sha256':'2'*64}
+            self.assertTrue(begin_revision(root,manifest,updated))
+            old=root/'history/pam_u1652'/('a'*64)
+            self.assertEqual((old/'model.pth').read_bytes(),b'old valid checkpoint')
+            self.assertNotIn('pam_u1652',manifest['artifacts'])
+            self.assertEqual(len(manifest['artifact_history']['pam_u1652']),1)
+            self.assertTrue(begin_revision(root,manifest,updated))
+            self.assertEqual(len(manifest['artifact_history']['pam_u1652']),1)
+
     def test_cleanup_checks_hash_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

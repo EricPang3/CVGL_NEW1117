@@ -77,6 +77,27 @@ def save(path, value):
     temporary.replace(path)
 
 
+def begin_revision(directory, manifest, ready):
+    """重跑产生新包时归档旧版本；相同包不重复接收，绝不覆盖旧权重。"""
+    job = ready["job"]
+    previous = manifest["artifacts"].get(job)
+    if previous is None:
+        return True
+    if all(previous.get(k) == ready.get(k) for k in ("bundle_sha256", "checkpoint_sha256")):
+        return False
+    old = directory / "history" / job / previous["bundle_sha256"]
+    target = directory / "artifacts" / job
+    if not old.exists() and target.exists():
+        old.parent.mkdir(parents=True, exist_ok=True)
+        target.rename(old)
+    records = manifest.setdefault("artifact_history", {}).setdefault(job, [])
+    if not any(r["bundle_sha256"] == previous["bundle_sha256"] for r in records):
+        records.append({**previous, "local_directory": str(old)})
+    del manifest["artifacts"][job]
+    save(directory / "archive_manifest.json", manifest)
+    return True
+
+
 def dashboard(directory, remote, manifest):
     results = remote.get("results", [])
     rows = []
@@ -100,7 +121,7 @@ def dashboard(directory, remote, manifest):
     (directory / "index.html").write_text(page, encoding="utf-8")
 
 
-def main(argv=None):
+def main(argv=None, on_poll=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", type=int, required=True)
@@ -136,12 +157,14 @@ def main(argv=None):
             polled = json.loads(command(REMOTE_POLL))
             remote = polled["state"]
             save(directory / "state.json", remote)
+            if on_poll is not None:
+                on_poll(remote)
             for ready in polled["ready"]:
                 job = ready["job"]
-                if job in manifest["artifacts"]:
-                    continue
                 if Path(job).name != job:
                     raise RuntimeError("非法任务名")
+                if not begin_revision(directory, manifest, ready):
+                    continue
                 target = artifacts / job
                 target.mkdir(exist_ok=True)
                 print("receiving", job, flush=True)

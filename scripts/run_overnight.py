@@ -14,9 +14,11 @@ import yaml
 try:
     from scripts.experiment_budget import budget_expired, parse_deadline
     from scripts.module_suite import now, write_json
+    from scripts.repair_experiments import prepare_repair
 except ModuleNotFoundError:
     from experiment_budget import budget_expired, parse_deadline
     from module_suite import now, write_json
+    from repair_experiments import prepare_repair
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,7 +66,22 @@ def main():
         primary = json.loads(path.read_text()) if path.exists() else {}
         if primary.get("status") == "complete":
             break
-        if primary.get("status") in ("partial_failure", "preflight_failed", "baseline_failed"):
+        if primary.get("status") in ("partial_failure", "repair_pending", "preflight_failed", "baseline_failed"):
+            request_file = directory / "repair_request.json"
+            request = json.loads(request_file.read_text()) if request_file.exists() else None
+            if primary["status"] in ("partial_failure", "repair_pending") and request and request["id"] not in state.get("primary_repairs", []):
+                try:
+                    prepare_repair(ROOT, base, request)
+                    state.setdefault("primary_repairs", []).append(request["id"])
+                    state.update(status="repairing_primary", active_run=base["run"])
+                    save()
+                    with (directory / "repair.log").open("a") as log:
+                        subprocess.run([sys.executable, "-u", "scripts/module_suite.py", "--config", args.config,
+                                        "--data-root", args.data_root], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, check=True)
+                    continue
+                except Exception as error:
+                    failed(base["run"], str(error))
+                    return
             failed(base["run"], primary.get("failures", primary.get("error")))
             return
         state["primary_progress"] = {"status": primary.get("status"), "active": primary.get("active"),

@@ -119,6 +119,22 @@ class ModuleTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(output).all())
         self.assertTrue(torch.isfinite(features.grad).all())
 
+    def test_pam_branch_uses_fp32_and_preserves_float32_formula(self):
+        module, _, _ = make_module("danet_pam")
+        x = (torch.randn(2,1024,12,12)*1000).requires_grad_()
+        with torch.no_grad():
+            module.pam.gamma.fill_(.5)
+            reduced = module.down(x)
+            expected = x + module.up(module.pam(reduced) - reduced)
+        with torch.autocast("cpu",dtype=torch.bfloat16):
+            output = module(x)
+        self.assertEqual(output.dtype,torch.float32)
+        self.assertTrue(torch.allclose(output,expected,atol=1e-5,rtol=1e-5))
+        output.square().mean().backward()
+        self.assertTrue(torch.isfinite(output).all())
+        self.assertTrue(torch.isfinite(x.grad).all())
+        self.assertTrue(all(p.grad is None or torch.isfinite(p.grad).all() for p in module.parameters()))
+
     def test_explicit_alpha_override_wins_over_loaded_parameter(self):
         model=torch.nn.Module()
         model.module_scale=torch.nn.Parameter(torch.tensor(.3))

@@ -48,8 +48,11 @@ class ProjectedPAM(nn.Module):
         self.up = nn.Conv2d(128, channels, 1, bias=False)
 
     def forward(self, x):
-        reduced = self.down(x)
-        return x + self.up(self.pam(reduced) - reduced)
+        # PAM的未缩放QK点积在FP16中可先于softmax溢出；保留作者公式，整条适配支路用FP32。
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            original = x.float()
+            reduced = self.down(original)
+            return original + self.up(self.pam(reduced) - reduced)
 
 
 class PooledBranch(nn.Module):
