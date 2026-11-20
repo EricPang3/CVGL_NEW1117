@@ -1,5 +1,7 @@
 # CVGL_NEW：AI 维护契约
 
+> 2026-11-20：用户授权33模块完整矩阵。先读不可修改的《核心思想（AI必读）.md》、模块目录和EXPERIMENT_LOG.md。以下baseline契约适用于module=none；显式模块实验允许目录中的共享适配头，不能删除原GAP旁路。队列配置configs/module_suite.yaml，脚本scripts/module_suite.py，本地接收scripts/collect_experiments.py。真实完成状态看outputs/modules20261120/state.json，不要把已排队写成已完成。
+
 ## 目标与用户约定
 
 目标是从“训练得到分数”变成可追溯、可看失败、可对照改进的实验工具。三个业务入口：train.py、evaluate.py、report.py。scripts/run_experiments.py只是顺序调用和打包，禁止再实现训练/指标逻辑。

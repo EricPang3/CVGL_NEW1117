@@ -1,6 +1,7 @@
 """特征提取和检索；训练结束与独立入口使用同一实现。"""
 
 from contextlib import nullcontext
+import time
 
 import numpy as np
 import torch
@@ -20,16 +21,26 @@ def extract_features(model, records, config, device):
                         batch_size=config["eval_batch_size"], num_workers=config["workers"],
                         shuffle=False, pin_memory=device.type == "cuda")
     features = []
+    offset = 0
     for images in tqdm(loader, desc="Extract features"):
         context = torch.autocast("cuda", dtype=torch.float16) if config["amp"] and device.type == "cuda" else nullcontext()
         with context:
             embedding = model(images.to(device))
         features.append(F.normalize(embedding.float(), dim=-1).cpu())
+        if getattr(model, "module_name", None) == "burst_gap":
+            densities = model.feature_module.last_density.cpu().tolist()
+            for record, density in zip(records[offset:offset + len(images)], densities):
+                record["diagnostics"] = {"repetition_density": density}
+        offset += len(images)
     return torch.cat(features)
 
 
 @torch.no_grad()
 def evaluate(model, config, device):
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+        torch.cuda.reset_peak_memory_stats(device)
+    started = time.perf_counter()
     queries, raw_gallery = build_records(config)
     query_ids = {r["id"] for r in queries}
     gallery = [r for r in raw_gallery if r["id"] != "-1" and
@@ -39,6 +50,9 @@ def evaluate(model, config, device):
     print(f"Query: {len(queries)}；gallery 原始/有效: {len(raw_gallery)}/{len(gallery)}")
     q_features = extract_features(model, queries, config, device)
     g_features = extract_features(model, gallery, config, device).to(device)
+    if device.type == "cuda":
+        torch.cuda.synchronize(device)
+    extracted_at = time.perf_counter()
     gallery_ids = np.array([r["id"] for r in gallery])
     results = []
     # 只保留一个查询块的分数，避免持有完整 Q×G 矩阵。
@@ -58,6 +72,12 @@ def evaluate(model, config, device):
             results.append({**query, **detail})
     metrics = summarize(results, len(gallery))
     metrics.update({"query_count": len(queries), "query_places": len(query_ids),
+                    "descriptor_dim": q_features.shape[1],
+                    "extra_parameters": sum(p.numel() for n, p in model.named_parameters() if n.startswith(("feature_module.", "parallel_projection.", "module_scale"))),
+                    "feature_extraction_seconds": extracted_at - started,
+                    "ranking_seconds": time.perf_counter() - extracted_at,
+                    "evaluation_seconds": time.perf_counter() - started,
+                    "peak_gpu_mb": torch.cuda.max_memory_allocated(device) / 2**20 if device.type == "cuda" else None,
                     "gallery_raw_count": len(raw_gallery), "gallery_count": len(gallery),
                     "gallery_raw_places": len({r["id"] for r in raw_gallery}),
                     "gallery_places": len(set(gallery_ids)),

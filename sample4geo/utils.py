@@ -2,6 +2,8 @@ import json
 import hashlib
 import os
 import random
+import subprocess
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -44,9 +46,21 @@ def records_hash(records):
     return hashlib.sha256(json.dumps(manifest, ensure_ascii=False).encode()).hexdigest()
 
 
+def snapshot_source(output):
+    files = [*ROOT.glob("*.py"), *ROOT.glob("*.txt"), *ROOT.glob("*.md"), *ROOT.glob("configs/*.yaml"),
+             *ROOT.glob("sample4geo/**/*.py"), *ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py"),
+             *[p for p in (ROOT / "third_party").rglob("*") if p.is_file() and "__pycache__" not in p.parts]]
+    with zipfile.ZipFile(output / "source.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(files):
+            archive.write(path, path.relative_to(ROOT))
+    git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True) if (ROOT / ".git").exists() else None
+    return {"source_sha256": hashlib.sha256((output / "source.zip").read_bytes()).hexdigest(),
+            "git_commit": git.stdout.strip() if git and git.returncode == 0 else None}
+
+
 def configure(config, args):
     for key in ("direction", "altitude", "data_root", "device", "workers", "img_size",
-                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation"):
+                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation", "module", "module_alpha", "freeze_backbone"):
         value = getattr(args, key, None)
         if value is not None:
             config[key] = value
@@ -67,6 +81,9 @@ def configure(config, args):
     # 旧 checkpoint 未记录这些字段；训练历史仍由原 checkpoint/config 保留。
     config.setdefault("augmentation", "s4g")
     config.setdefault("amp_init_scale", 1024)
+    config.setdefault("module", "none")
+    config.setdefault("module_alpha", 1.0 if config["module"] == "burst_gap" else 0.1)
+    config.setdefault("freeze_backbone", False)
     if config["augmentation"] not in ("s4g", "camp") or config["amp_init_scale"] <= 0:
         raise ValueError("augmentation 必须为 s4g/camp，amp_init_scale 必须大于 0")
     for key in ("img_size", "batch_size", "eval_batch_size", "epochs", "top_k"):

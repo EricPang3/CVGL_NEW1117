@@ -3,9 +3,9 @@ import math
 import numpy as np
 
 
-def score_query(scores, gallery_ids, query_id, top_k):
+def score_query(scores, gallery_ids, query_id, top_k, order=None):
     scores = np.asarray(scores)
-    order = np.argsort(-scores, kind="stable")
+    order = np.argsort(-scores, kind="stable") if order is None else np.asarray(order)
     correct = np.asarray(gallery_ids)[order] == query_id
     matches, negatives = np.flatnonzero(correct), np.flatnonzero(~correct)
     positive = int(order[matches[0]]) if len(matches) else None

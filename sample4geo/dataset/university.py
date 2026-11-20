@@ -10,6 +10,9 @@ from torch.utils.data import Dataset, Sampler
 
 from ..utils import ROOT, read_config
 
+# 单4090服务器16核，OpenCV默认128线程/worker会造成严重争用；不改变增强配方。
+cv2.setNumThreads(0)
+
 EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
 
 

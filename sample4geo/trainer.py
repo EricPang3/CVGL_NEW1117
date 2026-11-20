@@ -24,6 +24,8 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
     model.train()
     total, count = 0.0, 0
     started = time.monotonic()
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
     skipped, first_lr = 0, optimizer.param_groups[0]["lr"]
     for satellite, drone, _ in tqdm(loader, desc=f"Epoch {epoch}"):
         last_lr = optimizer.param_groups[0]["lr"]
@@ -51,5 +53,7 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
             "seconds": time.monotonic() - started, "pairs": count, "steps": len(loader),
             "optimizer_updates": len(loader) - skipped, "amp_skipped_steps": skipped,
             "amp_scale": scaler.get_scale(),
+            "peak_gpu_mb": torch.cuda.max_memory_allocated(device) / 2**20 if device.type == "cuda" else None,
+            "module_alpha": model.module_scale.detach().item() if hasattr(model, "module_scale") else None,
             "dropped_pairs": loader.batch_sampler.dropped,
             "logit_scale": model.logit_scale.detach().exp().item()}

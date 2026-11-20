@@ -1,0 +1,142 @@
+run: modules20261120
+baseline_run: matrix20261120_none
+seed: 1
+epochs: 1
+batch_size: 24
+directions:
+- D2S
+- S2D
+gallery_scope: query_ids
+top_k: 10
+rerank_candidates: 20
+report_limit: 200
+tasks:
+- dataset: U1652
+  altitude: null
+- dataset: SUES200
+  altitude: 150
+- dataset: SUES200
+  altitude: 200
+- dataset: SUES200
+  altitude: 250
+- dataset: SUES200
+  altitude: 300
+modules:
+- id: burst_gap
+  kind: frozen
+  alpha: 1.0
+- id: eca
+  kind: train
+  alpha: 0.1
+- id: wtconv
+  kind: train
+  alpha: 0.1
+- id: dwconv
+  kind: train
+  alpha: 0.1
+  control_for: wtconv
+- id: dwconv_budget
+  kind: train
+  alpha: 0.1
+  control_for: wtconv
+- id: boq
+  kind: train
+  alpha: 0.1
+- id: fcanet
+  kind: train
+  alpha: 0.1
+- id: fcanet_dc
+  kind: train
+  alpha: 0.1
+  control_for: fcanet
+- id: coordatt
+  kind: train
+  alpha: 0.1
+- id: selfnorm
+  kind: train
+  alpha: 0.1
+- id: se
+  kind: train
+  alpha: 0.1
+- id: cbam
+  kind: train
+  alpha: 0.1
+- id: triplet_attn
+  kind: train
+  alpha: 0.1
+- id: gcblock
+  kind: train
+  alpha: 1.0
+- id: grn
+  kind: train
+  alpha: 1.0
+- id: danet_pam
+  kind: train
+  alpha: 1.0
+- id: caa
+  kind: train
+  alpha: 0.1
+- id: osblock
+  kind: train
+  alpha: 0.1
+- id: inception_dw
+  kind: train
+  alpha: 0.1
+- id: uni_replk
+  kind: train
+  alpha: 0.1
+- id: acb
+  kind: train
+  alpha: 0.1
+- id: repvgg_block
+  kind: train
+  alpha: 0.1
+- id: ppm
+  kind: train
+  alpha: 0.1
+- id: odconv
+  kind: train
+  alpha: 0.1
+- id: sre_conv
+  kind: train
+  alpha: 0.1
+- id: gpo
+  kind: train
+  alpha: 0.1
+- id: salad
+  kind: train
+  alpha: 0.1
+- id: gem
+  kind: train
+  alpha: 0.1
+- id: gem_clipped_avg
+  kind: train
+  alpha: 0.1
+  control_for: gem
+- id: clip_attnpool
+  kind: train
+  alpha: 0.1
+- id: edtformer_head
+  kind: train
+  alpha: 0.1
+- id: netvlad
+  kind: train
+  alpha: 0.1
+- id: rmac
+  kind: train
+  alpha: 0.1
+- id: isqrt_cov
+  kind: train
+  alpha: 0.1
+- id: patch_netvlad
+  kind: rerank
+  alpha: 0.1
+- id: r2former_rerank
+  kind: rerank
+  alpha: 0.1
+- id: superglobal_rerank
+  kind: rerank
+  alpha: 0.1
+selection: all catalog entries; no test-based selection or tuning
+acknowledgement: single-seed exploratory matrix; paired multi-seed confirmation is
+  a subsequent experiment

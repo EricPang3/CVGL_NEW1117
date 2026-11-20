@@ -1,0 +1,297 @@
+{
+  "eca": {
+    "repo": "BangguWu/ECANet",
+    "branch": "master",
+    "path": "models/eca_module.py",
+    "url": "https://raw.githubusercontent.com/BangguWu/ECANet/master/models/eca_module.py",
+    "sha256": "6207d410dced66dcbec27bd5510430dca780a13dd21bedab4ce5317b3a816e57",
+    "bytes": 928,
+    "license_sha256": "c7f1d1c857a614565af01ef2a55f354cfef07cfbe4cf33d714e7d2b1073658ce"
+  },
+  "fcanet": {
+    "repo": "cfzd/FcaNet",
+    "branch": "master",
+    "path": "model/layer.py",
+    "url": "https://raw.githubusercontent.com/cfzd/FcaNet/master/model/layer.py",
+    "sha256": "06d857baa26234eeab107a885882d18c64d9a64880f635dcc35fd55c464c49e7",
+    "bytes": 4778,
+    "license_sha256": "b89822b2c2bab0398910a9dabeffb76feb5685588f897f0d2c031935a846e58f"
+  },
+  "coordatt": {
+    "repo": "houqb/CoordAttention",
+    "branch": "main",
+    "path": "coordatt.py",
+    "url": "https://raw.githubusercontent.com/houqb/CoordAttention/main/coordatt.py",
+    "sha256": "c40cc881d0a23b64c886274a9d8df7d13f04b6ec4fc935c3b281a82998f9ebfc",
+    "bytes": 1613,
+    "license_sha256": "263948396d6a475a6f473644f223d1f78c499ae95dd89934db59fd7b62782e52"
+  },
+  "selfnorm": {
+    "repo": "amazon-science/crossnorm-selfnorm",
+    "branch": "main",
+    "path": "models/cnsn.py",
+    "url": "https://raw.githubusercontent.com/amazon-science/crossnorm-selfnorm/main/models/cnsn.py",
+    "sha256": "9a31f67fba453f5483fe8b7fc0e4ef4d83e4ab06cae126646fc2e701d4ba965f",
+    "bytes": 5074,
+    "license_sha256": "65b2c6cc8d6c8069cd8d640aebe1229a8f9596fa39d88d43811c1f66c6a565b5"
+  },
+  "cbam": {
+    "repo": "Jongchan/attention-module",
+    "branch": "master",
+    "path": "MODELS/cbam.py",
+    "url": "https://raw.githubusercontent.com/Jongchan/attention-module/master/MODELS/cbam.py",
+    "sha256": "6a2115f71541c77ab09c666e4cf32ab9928520f9c2bba9c1ceab8edc8fdd8ac5",
+    "bytes": 3860,
+    "license_sha256": "a3560c921529f267558fd83b9ea2664194ce81c9b02f5990073200fd3ac50ecd"
+  },
+  "triplet_attn": {
+    "repo": "landskape-ai/triplet-attention",
+    "branch": "master",
+    "path": "triplet_attention.py",
+    "url": "https://raw.githubusercontent.com/landskape-ai/triplet-attention/master/triplet_attention.py",
+    "sha256": "1a8d7025c48e096d41736d9dc7d833bb3e59f0ccd000b80c7ec11c8a64f71c3a",
+    "bytes": 2464,
+    "license_sha256": "9040a90cb1c4115153ad2dd8389d3ef6df31f9afb4af1abccad0c19dd509774a"
+  },
+  "gcblock": {
+    "repo": "xvjiarui/GCNet",
+    "branch": "master",
+    "path": "mmdet/ops/gcb/context_block.py",
+    "url": "https://raw.githubusercontent.com/xvjiarui/GCNet/master/mmdet/ops/gcb/context_block.py",
+    "sha256": "c7699924eb3cb37b3a3af4ef37f93c5a787fe5afc498b374929492fafdad16cb",
+    "bytes": 3766,
+    "license_sha256": "02c5c55e19772184872c6c455553b15e4acac4b3a757550e7374f47723868ce1"
+  },
+  "grn": {
+    "repo": "facebookresearch/ConvNeXt-V2",
+    "branch": "main",
+    "path": "models/utils.py",
+    "url": "https://raw.githubusercontent.com/facebookresearch/ConvNeXt-V2/main/models/utils.py",
+    "sha256": "f7eca4be0696ccdae8b7a05387870cacc66d6408a7acc44b0b7f1ae56b2df631",
+    "bytes": 4180,
+    "license_sha256": "9ab7947f327be897e841ce58b90996c4b814c35127897b383f17616510115b9b"
+  },
+  "danet_pam": {
+    "repo": "CASIA-IVA-Lab/DANet",
+    "branch": "master",
+    "path": "encoding/nn/da_att.py",
+    "url": "https://raw.githubusercontent.com/CASIA-IVA-Lab/DANet/master/encoding/nn/da_att.py",
+    "sha256": "9d925fdc4857612e896551f24cfd7a99baab2e6c3ed7d4f080a6b34d205626f4",
+    "bytes": 3104,
+    "license_sha256": "96205f7b4668509c4e01a403c747eb8f5f5750d13ad98663bf3115b183956a61"
+  },
+  "wtconv": {
+    "repo": "BGU-CS-VIL/WTConv",
+    "branch": "main",
+    "path": "wtconv/wtconv2d.py",
+    "url": "https://raw.githubusercontent.com/BGU-CS-VIL/WTConv/main/wtconv/wtconv2d.py",
+    "sha256": "0a5baf5c82522925f7b227db26aa5e7b97d784c5d66ced9071f83213cb0d8fb5",
+    "bytes": 3492,
+    "license_sha256": "d978d35d1d560ce315b3ab6c946ec848ed08c9ffcecedba4cdc032933fee5c27"
+  },
+  "wavelet": {
+    "repo": "BGU-CS-VIL/WTConv",
+    "branch": "main",
+    "path": "wtconv/util/wavelet.py",
+    "url": "https://raw.githubusercontent.com/BGU-CS-VIL/WTConv/main/wtconv/util/wavelet.py",
+    "sha256": "eff13d7c58e771d0cd11ce9599b19995417f177684ceef114e0559bb63056308",
+    "bytes": 2694,
+    "license_sha256": "d978d35d1d560ce315b3ab6c946ec848ed08c9ffcecedba4cdc032933fee5c27",
+    "adaptation": "db1 closed-form filters; unused 1D functions removed; no PyWavelets dependency"
+  },
+  "caa": {
+    "repo": "PKINet/PKINet",
+    "branch": "main",
+    "path": "mmrotate/models/backbones/pkinet.py",
+    "url": "https://raw.githubusercontent.com/PKINet/PKINet/main/mmrotate/models/backbones/pkinet.py",
+    "sha256": "3bfe302aa83df8a2a42e511744d97037b6b4c2489027cac49b81625793475431",
+    "bytes": 20658,
+    "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "osblock": {
+    "repo": "KaiyangZhou/deep-person-reid",
+    "branch": "master",
+    "path": "torchreid/models/osnet.py",
+    "url": "https://raw.githubusercontent.com/KaiyangZhou/deep-person-reid/master/torchreid/models/osnet.py",
+    "sha256": "c7c1c29187d6330f859c91da229271531920464c7011aec13842a086b2263cae",
+    "bytes": 17037,
+    "license_sha256": "3ac8ce2a83d170cb1c7c84152e0c1faca1f187794303514383960d2441716247"
+  },
+  "inception_dw": {
+    "repo": "sail-sg/inceptionnext",
+    "branch": "main",
+    "path": "models/inceptionnext.py",
+    "url": "https://raw.githubusercontent.com/sail-sg/inceptionnext/main/models/inceptionnext.py",
+    "sha256": "c734f4efb2d3ae7041045bd5104548a7ccc555584b832ee4b3c1a72437ba0d3c",
+    "bytes": 13303,
+    "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "uni_replk": {
+    "repo": "AILab-CVC/UniRepLKNet",
+    "branch": "main",
+    "path": "unireplknet.py",
+    "url": "https://raw.githubusercontent.com/AILab-CVC/UniRepLKNet/main/unireplknet.py",
+    "sha256": "3fbedee7e5b50c49966fddaf7374ec397aa51cebea5c743fa03207927b4afe81",
+    "bytes": 35453,
+    "license_sha256": "43070e2d4e532684de521b885f385d0841030efa2b1a20bafb76133a5e1379c1"
+  },
+  "repvgg_block": {
+    "repo": "DingXiaoH/RepVGG",
+    "branch": "main",
+    "path": "repvgg.py",
+    "url": "https://raw.githubusercontent.com/DingXiaoH/RepVGG/main/repvgg.py",
+    "sha256": "8d8c9698a97b5a8e497a0e6072f3235c24385a73c7d1cf3e42bf99a1b67b47c9",
+    "bytes": 14868,
+    "license_sha256": "4867dd8b649487e737b1ef1abc1517a89bb0a6eac7d16bf0fa7d360ebe00f995"
+  },
+  "ppm": {
+    "repo": "hszhao/semseg",
+    "branch": "master",
+    "path": "model/pspnet.py",
+    "url": "https://raw.githubusercontent.com/hszhao/semseg/master/model/pspnet.py",
+    "sha256": "d049a45bbf345fcb716686dce170b60f31a898ac63078873463f12ebe9c14540",
+    "bytes": 4336,
+    "license_sha256": "b5197a136b201f32eb0bfd850a8226a1377a9172fd5e5d4ce940b6664e95d09f"
+  },
+  "odconv": {
+    "repo": "OSVAI/ODConv",
+    "branch": "main",
+    "path": "modules/odconv.py",
+    "url": "https://raw.githubusercontent.com/OSVAI/ODConv/main/modules/odconv.py",
+    "sha256": "b244b3d0964d799a4bedc7638c3bbf9092fa8742af01da2bb4628b7578c5c8b6",
+    "bytes": 6169,
+    "license_sha256": "263fc6448f8cb857c3b82711ca9d8c90f3af61b4fc272dd8e3c96beac9743e24"
+  },
+  "boq": {
+    "repo": "amaralibey/Bag-of-Queries",
+    "branch": "main",
+    "path": "src/boq.py",
+    "url": "https://raw.githubusercontent.com/amaralibey/Bag-of-Queries/main/src/boq.py",
+    "sha256": "289343f5f7d41c47b6a3b604af61479b384f0edd223f85d3bef6ea3929c75c1c",
+    "bytes": 2690,
+    "license_sha256": "ee735cd704d5231257d04ef6ae8202b74300c69687183cfaea5ebe4e3ba7a61d"
+  },
+  "gpo": {
+    "repo": "woodfrog/vse_infty",
+    "branch": "master",
+    "path": "lib/modules/aggr/gpo.py",
+    "url": "https://raw.githubusercontent.com/woodfrog/vse_infty/master/lib/modules/aggr/gpo.py",
+    "sha256": "64efbdcc9a9d6c30f4788b47414fbcf322bbe9e425281625bf4bf1cbdc3c33f1",
+    "bytes": 3239,
+    "license_sha256": "2891fccaf22c5f1a87e2f79ca30a431f326970a2c2e04800193bef63666c7358"
+  },
+  "salad": {
+    "repo": "serizba/salad",
+    "branch": "main",
+    "path": "models/aggregators/salad.py",
+    "url": "https://raw.githubusercontent.com/serizba/salad/main/models/aggregators/salad.py",
+    "sha256": "7c24560a1653a167aeea248f4566b445aa5a39dacc252f13adbac2f1a4f68726",
+    "bytes": 4735,
+    "license_sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+  },
+  "gem_rmac": {
+    "repo": "filipradenovic/cnnimageretrieval-pytorch",
+    "branch": "master",
+    "path": "cirtorch/layers/functional.py",
+    "url": "https://raw.githubusercontent.com/filipradenovic/cnnimageretrieval-pytorch/master/cirtorch/layers/functional.py",
+    "sha256": "c016ffb064d458c920c61add3f6d03f1f11ae2e89d1e06facf5854636e41019c",
+    "bytes": 5165,
+    "license_sha256": "c31c66c3945689e8876c9bbdb360228d13e4a15d84a77452dbe2db0ab67558e7"
+  },
+  "clip_attnpool": {
+    "repo": "openai/CLIP",
+    "branch": "main",
+    "path": "clip/model.py",
+    "url": "https://raw.githubusercontent.com/openai/CLIP/main/clip/model.py",
+    "sha256": "9902cbe5ee90a1da2aa3e6f043e8a23dc1f8831193b963785c9af03d5c7bef2c",
+    "bytes": 17374,
+    "license_sha256": "987e63b32f6c89ff5160e429458a872ff048e6860b590a3912e938f9da8f14db"
+  },
+  "edtformer_head": {
+    "repo": "Tong-Jin01/EDTformer",
+    "branch": "main",
+    "path": "network.py",
+    "url": "https://raw.githubusercontent.com/Tong-Jin01/EDTformer/main/network.py",
+    "sha256": "8249992ecc6f00fe46ea31a6c0557e0bb3490c2bec5dba25f7f3a79f5d5edef6",
+    "bytes": 1893,
+    "license_sha256": "9bdacd19e732d57146a33f6bf776b3691eb3cab9de1d786521e55c8442609bc1"
+  },
+  "netvlad": {
+    "repo": "QVPR/Patch-NetVLAD",
+    "branch": "main",
+    "path": "patchnetvlad/models/netvlad.py",
+    "url": "https://raw.githubusercontent.com/QVPR/Patch-NetVLAD/main/patchnetvlad/models/netvlad.py",
+    "sha256": "a648885ceceadac289cdf40809dfc8aa2db31533548ac6c624bb61f0e785cb70",
+    "bytes": 5437,
+    "license_sha256": "3df73bbe7dec87510d0962c404558b1a810bbe3209e745835f1b4cf2bff84cc4"
+  },
+  "isqrt_cov": {
+    "repo": "jiangtaoxie/fast-MPN-COV",
+    "branch": "master",
+    "path": "src/representation/MPNCOV.py",
+    "url": "https://raw.githubusercontent.com/jiangtaoxie/fast-MPN-COV/master/src/representation/MPNCOV.py",
+    "sha256": "80a08bf0eca7ebdcff929298fb0bfa8000af983c1471f7f5fd0f6043e59e0aab",
+    "bytes": 8344,
+    "license_sha256": "d4dbaf28f7c7af485978a3cd47fc642b6cfe2c6022812253cb20e5972f1b09bf"
+  },
+  "patch_netvlad": {
+    "repo": "QVPR/Patch-NetVLAD",
+    "branch": "main",
+    "path": "patchnetvlad/models/patchnetvlad.py",
+    "url": "https://raw.githubusercontent.com/QVPR/Patch-NetVLAD/main/patchnetvlad/models/patchnetvlad.py",
+    "sha256": "27bba320c3d5c13c0a75c0f26609252103d32c769d50d2d844ce27c134cb7c70",
+    "bytes": 8428,
+    "license_sha256": "3df73bbe7dec87510d0962c404558b1a810bbe3209e745835f1b4cf2bff84cc4"
+  },
+  "r2former_rerank": {
+    "repo": "bytedance/R2Former",
+    "branch": "main",
+    "path": "model/R2Former.py",
+    "url": "https://raw.githubusercontent.com/bytedance/R2Former/main/model/R2Former.py",
+    "sha256": "4dfb48a1db8e38e2d86445d74a80faa9a0d01e7ed4721ecddbfc40c495b9e993",
+    "bytes": 13399,
+    "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "acb": {
+    "repo": "DingXiaoH/ACNet",
+    "branch": "master",
+    "path": "acnet/acb.py",
+    "url": "https://raw.githubusercontent.com/DingXiaoH/ACNet/master/acnet/acb.py",
+    "sha256": "75f18ac6ea1de4760500eeb55d9384ae48b66657c953b8e26c4fd461a138022f"
+  },
+  "saca": {
+    "repo": "Tong-Jin01/EDTformer",
+    "branch": "main",
+    "path": "SACA.py",
+    "url": "https://raw.githubusercontent.com/Tong-Jin01/EDTformer/main/SACA.py",
+    "sha256": "b4b5f1d008e397a24d3be6193773459f14b8eafa5fbe3aacc87b053d09b24839"
+  },
+  "mda": {
+    "repo": "ShihaoShao-GH/SuperGlobal",
+    "branch": "main",
+    "path": "modules/reranking/MDescAug.py",
+    "url": "https://raw.githubusercontent.com/ShihaoShao-GH/SuperGlobal/main/modules/reranking/MDescAug.py",
+    "sha256": "96d4b35d5cc3579bd0534d984984a7ee379fdd9665c82d76820a846d881a2d60"
+  },
+  "superglobal": {
+    "repo": "ShihaoShao-GH/SuperGlobal",
+    "branch": "main",
+    "path": "modules/reranking/RerankwMDA.py",
+    "url": "https://raw.githubusercontent.com/ShihaoShao-GH/SuperGlobal/main/modules/reranking/RerankwMDA.py",
+    "sha256": "ba4f86b85f55e4cb245d5bb499ec22b4021bccb5ef9a80bed3ac7e43950aa0a8"
+  },
+  "sre_conv": {
+    "repo": "XYPB/SRE-Conv",
+    "branch": "master",
+    "path": "src/SRE_Conv/sre_conv.py",
+    "url": "https://raw.githubusercontent.com/XYPB/SRE-Conv/master/src/SRE_Conv/sre_conv.py",
+    "sha256": "022d40e25394ab2fc6e032295be8c31f8b812625cef7cb44e8cc74b6cf067c52"
+  },
+  "burst": {
+    "repo": "Ahmedest61/VLAD-BuFF",
+    "branch": "main",
+    "path": "models/aggregators/aggregation.py",
+    "url": "https://raw.githubusercontent.com/Ahmedest61/VLAD-BuFF/main/models/aggregators/aggregation.py",
+    "sha256": "0cace373afc505f2474d15562db89ec339ebf7fb3a6abbeb9e867129337a8a19"
+  }
+}

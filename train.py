@@ -5,8 +5,6 @@ import csv
 import math
 import platform
 import hashlib
-import subprocess
-import zipfile
 from datetime import datetime
 from importlib.metadata import version
 
@@ -15,9 +13,9 @@ from torch.utils.data import DataLoader
 
 from sample4geo.dataset import U1652DatasetTrain, UniqueBatchSampler, build_records, get_transforms
 from sample4geo.loss import InfoNCE
-from sample4geo.model import MODEL_NAME, TimmModel
+from sample4geo.model import MODEL_NAME, TimmModel, load_model_state
 from sample4geo.trainer import cosine_scheduler, train_epoch
-from sample4geo.utils import ROOT, configure, experiment_config, load_weights, new_output, records_hash, save_config, setup
+from sample4geo.utils import ROOT, configure, experiment_config, load_weights, new_output, records_hash, save_config, setup, snapshot_source
 
 
 def main():
@@ -33,6 +31,9 @@ def main():
         parser.add_argument(f"--{key}", type=int)
     parser.add_argument("--lr", type=float)
     parser.add_argument("--augmentation", choices=["s4g", "camp"])
+    parser.add_argument("--module", help="none 或模块实验 ID")
+    parser.add_argument("--module-alpha", type=float)
+    parser.add_argument("--freeze-backbone", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--device")
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--pretrained", action=argparse.BooleanOptionalAction, default=None)
@@ -40,10 +41,11 @@ def main():
     config = configure(experiment_config(args), args)
     device = setup(config)
     satellite, drone = build_records(config, training=True)
-    model = TimmModel(pretrained=config["pretrained"] and not args.init_checkpoint)
+    options = {} if config["module"] == "none" and not config["freeze_backbone"] else dict(module=config["module"], module_alpha=config["module_alpha"], freeze_backbone=config["freeze_backbone"])
+    model = TimmModel(pretrained=config["pretrained"] and not args.init_checkpoint, **options)
     if args.init_checkpoint:
         state, _ = load_weights(args.init_checkpoint)
-        model.load_state_dict(state, strict=True)
+        load_model_state(model, state, initialize_module=config["module"] != "none")
         del state
     data = model.data_config()
     config.update({"model": MODEL_NAME, "pool": "avg", "shared_encoder": True,
@@ -65,6 +67,9 @@ def main():
                    "synchronized_flip_rng": "numpy", "scheduler": "s4g_cosine",
                    "planned_steps_per_epoch": math.ceil(len(drone) / config["batch_size"]),
                    "timm": version("timm"), "albumentations": version("albumentations")})
+    config["parameters"] = sum(p.numel() for p in model.parameters())
+    config["trainable_parameters"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    config["extra_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
     if config["dataset"] == "SUES200":
         config["split_sha256"] = hashlib.sha256((ROOT / "configs/sues200_split.yaml").read_bytes()).hexdigest()
     dataset = U1652DatasetTrain(satellite, drone, get_transforms(config, training=True))
@@ -74,20 +79,11 @@ def main():
     scheduler = cosine_scheduler(optimizer, config["planned_steps_per_epoch"], config)
     criterion = InfoNCE(config["label_smoothing"])
     output = new_output(config, args.name)
-    # 保存实际源码，即使未 commit 的实验也能追溯；不包含数据、权重或历史输出。
-    source_files = [*ROOT.glob("*.py"), *ROOT.glob("*.txt"), *ROOT.glob("*.md"),
-                    *ROOT.glob("configs/*.yaml"), *ROOT.glob("sample4geo/**/*.py"),
-                    *ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py")]
-    with zipfile.ZipFile(output / "source.zip", "w", zipfile.ZIP_DEFLATED) as archive:
-        for path in sorted(source_files):
-            archive.write(path, path.relative_to(ROOT))
-    config["source_sha256"] = hashlib.sha256((output / "source.zip").read_bytes()).hexdigest()
-    git = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True) if (ROOT / ".git").exists() else None
-    config["git_commit"] = git.stdout.strip() if git and git.returncode == 0 else None
+    config.update(snapshot_source(output))
     save_config(config, output / "config.yaml")
     print(f"训练输出：{output}")
     fields = ["epoch", "loss", "lr", "first_lr", "seconds", "pairs", "steps", "optimizer_updates",
-              "amp_skipped_steps", "amp_scale", "dropped_pairs", "logit_scale"]
+              "amp_skipped_steps", "amp_scale", "dropped_pairs", "logit_scale", "peak_gpu_mb", "module_alpha"]
     with (output / "train.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()

@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sample4geo.evaluate import evaluate
-from sample4geo.model import MODEL_NAME, TimmModel
+from sample4geo.model import MODEL_NAME, TimmModel, load_model_state
 from sample4geo.utils import configure, experiment_config, load_weights, save_config, save_json, setup
 
 
@@ -21,6 +21,8 @@ def main():
     parser.add_argument("--altitude", type=int, choices=[150, 200, 250, 300])
     parser.add_argument("--data-root")
     parser.add_argument("--gallery-scope", choices=["all", "query_ids"])
+    parser.add_argument("--module", help="默认恢复权重模块；裸基线权重仅允许额外启用无训练的 burst_gap")
+    parser.add_argument("--module-alpha", type=float)
     parser.add_argument("--device")
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--overwrite", action="store_true", help="明确允许替换该目录的已有评估结果")
@@ -36,13 +38,18 @@ def main():
     # batch-size 在此表示评估批量，不改写训练批量记录。
     batch_size, args.batch_size = args.batch_size, None
     config = configure(config, args)
+    if args.module == "burst_gap" and args.module_alpha is None:
+        config["module_alpha"] = 1.0
     if batch_size is not None:
         if batch_size < 1:
             parser.error("batch-size 必须大于 0")
         config["eval_batch_size"] = batch_size
     device = setup(config)
-    model = TimmModel(pretrained=False)
-    model.load_state_dict(state, strict=True)
+    if args.module and args.module != saved.get("module", "none") and args.module != "burst_gap":
+        parser.error("只能对已有基线额外启用无训练的 burst_gap；其他模块必须加载已训练权重")
+    options = {} if config["module"] == "none" else dict(module=config["module"], module_alpha=config["module_alpha"])
+    model = TimmModel(pretrained=False, **options)
+    load_model_state(model, state, initialize_module=config["module"] == "burst_gap" and saved.get("module", "none") == "none")
     del state
     data = model.data_config()
     config.setdefault("mean", list(data["mean"]))

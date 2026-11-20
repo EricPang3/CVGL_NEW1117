@@ -27,12 +27,18 @@ def load_result(directory):
     return data, metrics
 
 
-def compare_results(current, current_metrics, previous, previous_metrics):
+def compare_results(current, current_metrics, previous, previous_metrics, allow_reranking=False):
     """只允许同一评估任务比较，避免把换图库/划分误认为模型进步。"""
     for key in ("dataset", "direction", "altitude", "img_size", "mean", "std", "amp"):
         if current.get("evaluation", {}).get(key) != previous.get("evaluation", {}).get(key):
             raise ValueError(f"无法比较：评估设置 {key} 不一致")
-    if current_metrics["protocol"] != previous_metrics["protocol"]:
+    current_protocol, previous_protocol = dict(current_metrics["protocol"]), dict(previous_metrics["protocol"])
+    if allow_reranking:
+        if not current_metrics.get("reranking"):
+            raise ValueError("显式重排对比要求结果中有完整reranking记录")
+        current_protocol.pop("ranking", None)
+        previous_protocol.pop("ranking", None)
+    if current_protocol != previous_protocol:
         raise ValueError("无法比较：指标协议不一致")
     manifest = lambda records: sorted((r["key"], r["id"]) for r in records if r.get("included", True))
     if manifest(current.get("gallery", [])) != manifest(previous.get("gallery", [])):
@@ -59,14 +65,14 @@ def compare_results(current, current_metrics, previous, previous_metrics):
     return {"counts": counts, "delta": delta, "queries": changes}, before
 
 
-def build_report(directory, limit=0, compare=None):
+def build_report(directory, limit=0, compare=None, allow_reranking=False):
     directory = Path(directory).expanduser().resolve()
     data, metrics = load_result(directory)
     comparison, previous = None, {}
     if compare:
         compare = Path(compare).expanduser().resolve()
         old_data, old_metrics = load_result(compare)
-        comparison, previous = compare_results(data, metrics, old_data, old_metrics)
+        comparison, previous = compare_results(data, metrics, old_data, old_metrics, allow_reranking)
         comparison["baseline"] = str(compare)
     if limit < 0:
         raise ValueError("limit 必须非负；0 表示全部")
@@ -131,7 +137,7 @@ def build_report(directory, limit=0, compare=None):
                "cases": cases, "total": len(data["queries"])}
     encoded = json.dumps(payload, ensure_ascii=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
     (report / "index.html").write_text(HTML.replace("__DATA__", encoded), encoding="utf-8")
-    for filename in ("metrics.json", "queries.json", "evaluation.yaml", "training_config.yaml", "config.yaml", "train.csv", "source.zip"):
+    for filename in ("metrics.json", "queries.json", "evaluation.yaml", "training_config.yaml", "config.yaml", "train.csv", "source.zip", "head_train.csv", "fit_config.yaml", "reranking.yaml", "mechanism_analysis.json"):
         source = directory / filename
         if source.is_file():
             shutil.copy2(source, report / filename)
@@ -175,6 +181,7 @@ function saveNotes(){try{localStorage.setItem(storageKey,JSON.stringify(notes));
 $('export').onclick=()=>{const a=node('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({evaluation:cfg,annotations:notes},null,2)],{type:'application/json'}));a.download='annotations.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);};
 $('import').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(!imported.annotations||typeof imported.annotations!=='object'||Array.isArray(imported.annotations))throw Error();for(const [key,value] of Object.entries(imported.annotations)){if(value&&typeof value.category==='string'&&typeof value.note==='string')notes[key]={category:value.category,note:value.note};}saveNotes();render();}catch(e){$('annotation-status').textContent='导入失败：请选择导出的标注 JSON。';}};
 $('context').textContent=[cfg.dataset,cfg.direction,cfg.altitude?cfg.altitude+' m':'',cfg.checkpoint?'权重：'+cfg.checkpoint.split('/').pop():''].filter(Boolean).join(' · ');
+if(data.metrics.reranking)$('context').textContent+=' · 重排 '+data.metrics.reranking.method+'；候选图片分数仍为原GAP余弦，排名经过重排';
 for(const key of ['recall@1','recall@5','recall@10','recall@1%','mAP']){const el=node('div',undefined,'metric');el.append(node('span',key),node('strong',(data.metrics[key]*100).toFixed(2)+'%'));if(data.comparison)el.append(node('small','变化 '+(data.comparison.delta[key]*100).toFixed(2)+' 个百分点'));$('metrics').append(el);}
 if(data.comparison){const c=data.comparison.counts;$('comparison').textContent=`相比基线：修好 ${c.fixed} 张，退步 ${c.regressed} 张，两次均错 ${c.still_wrong} 张，两次均对 ${c.still_correct} 张。`;}
 $('config').textContent=JSON.stringify(cfg,null,2);
@@ -193,8 +200,9 @@ def main():
     parser.add_argument("--experiment", required=True, help="包含 metrics.json 和 queries.json 的目录")
     parser.add_argument("--limit", type=int, default=0, help="最多展示的案例数；默认 0 表示全部，完整离线包可能较大")
     parser.add_argument("--compare", help="基线评估目录，或解压后的完整离线报告目录")
+    parser.add_argument("--allow-reranking-comparison", action="store_true", help="显式允许与同查询/图库/指标定义的GAP初排比较；重排方法必须完整记录")
     args = parser.parse_args()
-    build_report(args.experiment, args.limit, args.compare)
+    build_report(args.experiment, args.limit, args.compare, args.allow_reranking_comparison)
 
 
 if __name__ == "__main__":
