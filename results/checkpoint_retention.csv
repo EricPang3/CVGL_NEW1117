@@ -1,0 +1,35 @@
+﻿module,dataset,altitude,reason
+baseline,all,all,all seeds retained; runtime dependency
+acb,U1652,,"U1652 best candidate or ECA seed-reversal diagnostic; seed1 best recall@1 for ('U1652', None, 'D2S'); storage selection only; seed1 best mAP for ('U1652', None, 'D2S'); storage selection only"
+cbam,SUES200,300,"seed1 best recall@1 for ('SUES200', 300, 'S2D'); storage selection only; seed1 best mAP for ('SUES200', 300, 'S2D'); storage selection only"
+clip_attnpool,SUES200,150,"seed1 best recall@1 for ('SUES200', 150, 'S2D'); storage selection only; seed1 best mAP for ('SUES200', 150, 'S2D'); storage selection only"
+clip_attnpool,SUES200,300,"seed1 best recall@1 for ('SUES200', 300, 'D2S'); storage selection only; seed1 best mAP for ('SUES200', 300, 'D2S'); storage selection only"
+coordatt,SUES200,150,mechanism comparison or cross-task candidate; same pairs retained in every seed
+coordatt,SUES200,200,mechanism comparison or cross-task candidate; same pairs retained in every seed
+coordatt,SUES200,250,mechanism comparison or cross-task candidate; same pairs retained in every seed
+coordatt,SUES200,300,mechanism comparison or cross-task candidate; same pairs retained in every seed
+coordatt,U1652,,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv,SUES200,150,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv,SUES200,200,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv,SUES200,250,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv,SUES200,300,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv,U1652,,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv_budget,SUES200,150,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv_budget,SUES200,200,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv_budget,SUES200,250,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv_budget,SUES200,300,mechanism comparison or cross-task candidate; same pairs retained in every seed
+dwconv_budget,U1652,,mechanism comparison or cross-task candidate; same pairs retained in every seed
+eca,U1652,,U1652 best candidate or ECA seed-reversal diagnostic
+gem,SUES200,200,GeM comparison against the p=1 clipped-average control
+gem_clipped_avg,SUES200,200,"seed1 best recall@1 for ('SUES200', 200, 'D2S'); storage selection only; seed1 best mAP for ('SUES200', 200, 'D2S'); storage selection only"
+patch_netvlad,U1652,,"seed1 best recall@1 for ('U1652', None, 'S2D'); storage selection only"
+ppm,U1652,,"U1652 best candidate or ECA seed-reversal diagnostic; seed1 best mAP for ('U1652', None, 'S2D'); storage selection only"
+rmac,SUES200,200,"seed1 best recall@1 for ('SUES200', 200, 'S2D'); storage selection only; seed1 best mAP for ('SUES200', 200, 'S2D'); storage selection only"
+superglobal_rerank,SUES200,250,"seed1 best recall@1 for ('SUES200', 250, 'S2D'); storage selection only; seed1 best mAP for ('SUES200', 250, 'S2D'); storage selection only"
+triplet_attn,SUES200,250,"seed1 best recall@1 for ('SUES200', 250, 'D2S'); storage selection only; seed1 best mAP for ('SUES200', 250, 'D2S'); storage selection only"
+uni_replk,SUES200,150,"seed1 best recall@1 for ('SUES200', 150, 'D2S'); storage selection only; seed1 best mAP for ('SUES200', 150, 'D2S'); storage selection only"
+wtconv,SUES200,150,mechanism comparison or cross-task candidate; same pairs retained in every seed
+wtconv,SUES200,200,mechanism comparison or cross-task candidate; same pairs retained in every seed
+wtconv,SUES200,250,mechanism comparison or cross-task candidate; same pairs retained in every seed
+wtconv,SUES200,300,mechanism comparison or cross-task candidate; same pairs retained in every seed
+wtconv,U1652,,mechanism comparison or cross-task candidate; same pairs retained in every seed

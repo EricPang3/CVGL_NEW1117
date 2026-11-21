@@ -102,6 +102,10 @@ python -m unittest discover -s tests -v
 融合系数初值在训练配置，结尾值在train.csv，评估实际值在evaluation.yaml。`--module-alpha 0`关闭的是当前权重的模块旁路，不能冒充独立训练的none基线。SelfNorm统计、GeM幂与二阶矩阵运算保持FP32兼容AMP。
 # 持续运行与固定种子复验
 
+实验表保存在 `results/`：`all_metrics.csv` 为完整长表，`modules20261120_R1.csv`、`modules20261120_mAP.csv` 为首轮双向/四高度宽表，`replication.csv` 为配对seed复验。数值均为百分比，增益为百分点；未运行留空。接收程序持续更新这些表。
+
+权重按 `configs/checkpoint_retention.json` 保留，清单见 `results/checkpoint_retention.csv`；baseline、最优候选和关键对照保留，其余只保留指标、逐图结果、报告和源码。`python scripts/experiment_records.py` 仅导表，增加 `--apply` 才清理已完成且记录完整的本地权重；手动清理前先停止接收程序，避免同时写归档清单。删除历史见 `results/weight_cleanup.csv`，实际可用权重见 `results/checkpoint_inventory.csv`。
+
 当前批次可在服务器运行 `python scripts/run_overnight.py --until 2026-11-21T12:00:00+08:00`：等待原矩阵完成后，按原顺序使用seed2、3…补充验证，每个seed独立训练对应baseline。时间到后只停止新增补充任务，当前任务正常完成；原矩阵继续优先完整执行。
 
 本地运行 `python scripts/collect_overnight.py --host root@服务器 --port SSH端口 --shutdown` 跟随服务器计划。复用当前SSH控制连接，不保存密码；本地电脑和网络须保持在线。总入口为 `outputs/overnight20261120/index.html`。所有已完成任务下载并校验、且预算时间已到后才请求关机；失败时保留环境。请避免同时启动原单矩阵的 `--shutdown-when-complete` 接收程序。

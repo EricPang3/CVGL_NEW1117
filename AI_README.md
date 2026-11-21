@@ -38,6 +38,12 @@
 
 ## 运行边界
 
+2026-11-21用户明确允许删除不用权重。完整首轮370项已完成，PAM已统一修复重跑；results/保存可入Git的CSV表，outputs/保留原始指标、queries、离线报告、配置、源码和归档记录。configs/checkpoint_retention.json只控制存储，不筛选训练任务。保留各seed baseline、任务最优候选和关键对照；其余权重可按策略删除，所有轻量reranker头保留。先检查results/checkpoint_inventory.csv和实际文件是否存在，不要假设每个已评估模型都有model.pth。旧20261117及smoke权重已按用户授权删除，旧指标单独存legacy表。
+
+scripts/experiment_records.py导出百分比表与配对seed表；--apply仅在记录完整时清理已完成的本地权重，清理前停止接收程序以免并发写manifest。删除写weight_cleanup.csv，future不下载的权重写manifest的checkpoint_storage=discarded_by_policy及策略SHA。离线案例不需要权重；重新提特征需要保留权重或按原配置重训。
+
+当前夜间流程是run_overnight.py与collect_overnight.py：原矩阵完成后补seed复验，12点后停止新增补充任务，当前任务完成且所有记录校验归档后关机。module_suite.py会记录失败并继续其他任务；只有已经验证并登记的repair_request才整组重跑，不具备自动改代码能力。下面的失败停止规则特指旧批量入口run_experiments.py。
+
 批量入口默认5训练/10评估/10报告；仅全部成功并打包后按显式--shutdown关机。失败落run.json和日志并停止，保留产物，不自动续跑或自动修复。AutoDL /usr/bin/shutdown是无shebang脚本，此环境用/bin/bash调用。
 
 源码快照和hash、实际配置、库版本、地点/清单/权重指纹用于追溯。旧20261117_full_seed1属于旧配方，不覆盖、不重命名成新结果。代码修改不等于GPU新指标验证完成。

@@ -11,6 +11,11 @@ import time
 import zipfile
 from pathlib import Path
 
+try:
+    from scripts.experiment_records import export_tables, keep_checkpoint, load_policy
+except ModuleNotFoundError:
+    from experiment_records import export_tables, keep_checkpoint, load_policy
+
 ROOT = Path(__file__).resolve().parents[1]
 
 REMOTE_POLL = r'''
@@ -105,18 +110,21 @@ def dashboard(directory, remote, manifest):
         label = "u1652" if row["dataset"] == "U1652" else f'sues200_{row["altitude"]}'
         job = f'{row["module"]}_{label}'
         url = f'artifacts/{job}/{row["direction"]}/report/index.html'
-        link = f'<a href="{url}">{html.escape(row["module"])}</a>' if job in manifest["artifacts"] else html.escape(row["module"])
+        entry = manifest["artifacts"].get(job, {})
+        current = entry.get("checkpoint_sha256") == row.get("checkpoint_sha256")
+        link = f'<a href="{url}">{html.escape(row["module"])}</a>' if entry and current else html.escape(row["module"])
         cells = [link, html.escape(row["kind"]), html.escape(row["dataset"]), str(row["altitude"] or "—"), row["direction"],
                  f'{row["recall@1"]:.4f}', f'{row["mAP"]:.4f}', f'{row["delta_R1_pp"]:+.4f}', f'{row["delta_AP_pp"]:+.4f}',
-                 str(row.get("fixed_queries", "—")), str(row.get("regressed_queries", "—")), str(row.get("extra_parameters", "—"))]
+                 str(row.get("fixed_queries", "—")), str(row.get("regressed_queries", "—")), str(row.get("extra_parameters", "—")),
+                 html.escape(entry.get("checkpoint_storage", "待归档"))]
         rows.append('<tr>' + ''.join('<td>'+c+'</td>' for c in cells) + '</tr>')
     status = html.escape(str(remote.get("status")))
     active = html.escape(str(remote.get("active", "")))
     page = '<!doctype html><meta charset="utf-8"><title>33模块实验总览</title><style>body{font-family:system-ui;padding:24px;color:#243543}table{border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}input{padding:10px;width:350px}a{color:#176b75}</style>'
     page += f'<h1>33模块实验总览</h1><p>运行：{html.escape(directory.name)}；seed：{remote.get("seed", 1)}；状态：{status}；当前：{active}</p><p>真实评估 {len(results)}/370；本地已归档 {len(manifest["artifacts"])}/{remote.get("expected_archive_tasks", 190)} 个任务。点击已归档模块看案例；分数为百分比，差值为百分点。</p>'
-    page += '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重在artifacts/任务/model.pth；冻结或重排方法复用baseline_none对应权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>'
+    page += '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重按configs/checkpoint_retention.json保留；discarded_by_policy表示只保留结果，shared_baseline表示共用baseline权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>'
     page += '<input placeholder="筛选模块、数据集或方向" oninput="for(const r of document.querySelectorAll(\'tbody tr\'))r.hidden=!r.textContent.toLowerCase().includes(this.value.toLowerCase())">'
-    page += '<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('模块','类型','数据集','高度','方向','R@1','AP','ΔR@1','ΔAP','修好','退步','额外参数'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
+    page += '<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('模块','类型','数据集','高度','方向','R@1','AP','ΔR@1','ΔAP','修好','退步','额外参数','权重状态'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
     page += '<p>状态与命令：state.json、commands.jsonl；归档清单：archive_manifest.json。单seed差异不能证明稳定增益；人工查看案例用于形成假设。</p>'
     (directory / "index.html").write_text(page, encoding="utf-8")
 
@@ -138,6 +146,8 @@ def main(argv=None, on_poll=None):
     artifacts.mkdir(exist_ok=True)
     manifest_file = directory / "archive_manifest.json"
     manifest = json.loads(manifest_file.read_text()) if manifest_file.exists() else {"artifacts": {}, "status": "collecting"}
+    policy = load_policy(ROOT)
+    policy_hash = file_hash(ROOT / "configs/checkpoint_retention.json") if policy else None
     common = ["-o", f"ControlPath={args.socket}", "-o", "BatchMode=yes", "-o", "ConnectTimeout=20",
               "-o", "UserKnownHostsFile=/tmp/cvgl_known_hosts", "-o", "StrictHostKeyChecking=yes"]
     ssh = ["ssh", *common, "-p", str(args.port), args.host]
@@ -159,6 +169,7 @@ def main(argv=None, on_poll=None):
             save(directory / "state.json", remote)
             if on_poll is not None:
                 on_poll(remote)
+            export_tables(ROOT)
             for ready in polled["ready"]:
                 job = ready["job"]
                 if Path(job).name != job:
@@ -173,7 +184,8 @@ def main(argv=None, on_poll=None):
                     download(ready["bundle"], bundle)
                 if file_hash(bundle) != ready["bundle_sha256"]:
                     raise RuntimeError(f"结果包校验失败：{job}")
-                if ready["archive_checkpoint"]:
+                retain_weight = keep_checkpoint(policy, remote.get("jobs", {}).get(job), ready)
+                if ready["archive_checkpoint"] and retain_weight:
                     weight = target / "model.pth"
                     if not weight.exists() or file_hash(weight) != ready["checkpoint_sha256"]:
                         download(ready["checkpoint"], weight)
@@ -192,9 +204,17 @@ def main(argv=None, on_poll=None):
                                 if not (target / direction / "report" / name).resolve().is_relative_to(target.resolve()):
                                     raise RuntimeError("报告ZIP出现非法路径")
                             archive.extractall(target / direction / "report")
+                if ready["archive_checkpoint"]:
+                    ready["checkpoint_storage"] = "retained" if retain_weight else "discarded_by_policy"
+                    if not retain_weight:
+                        (target / "model.pth").unlink(missing_ok=True)
+                        (target / "model.pth.partial").unlink(missing_ok=True)
+                else:
+                    ready["checkpoint_storage"] = "shared_baseline"
+                ready["checkpoint_retention_policy_sha256"] = policy_hash
                 ready["local_directory"] = str(target)
                 ready["run"] = args.run
-                # 本地校验完成后才向服务器确认，基线留在远端供后续方法使用。
+                # 结果包必须先校验；选中权重也必须本地校验。用户允许丢弃的权重由远端校验SHA后清理。
                 command(REMOTE_ACK, ready)
                 manifest["artifacts"][job] = ready
                 save(manifest_file, manifest)
@@ -223,6 +243,7 @@ def main(argv=None, on_poll=None):
                 for name in polled["summary_files"]:
                     download(f"/root/autodl-tmp/CVGL_NEW/outputs/{args.run}/{name}", directory / name)
                 if remote["status"] in ("complete", "budget_reached") and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 190):
+                    export_tables(ROOT)
                     if args.shutdown_when_complete:
                         subprocess.run([*ssh, "/bin/bash /usr/bin/shutdown"], check=True, timeout=120)
                         manifest["shutdown"] = "requested_after_verified_local_archive"

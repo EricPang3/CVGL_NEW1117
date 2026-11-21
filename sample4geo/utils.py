@@ -48,7 +48,7 @@ def records_hash(records):
 
 def snapshot_source(output, filename="source.zip"):
     files = [*ROOT.glob("*.py"), *ROOT.glob("*.txt"), *ROOT.glob("*.md"), *ROOT.glob("configs/*.yaml"),
-             *ROOT.glob("sample4geo/**/*.py"), *ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py"),
+             *ROOT.glob("configs/*.json"), *ROOT.glob("sample4geo/**/*.py"), *ROOT.glob("scripts/*.py"), *ROOT.glob("tests/*.py"),
              *[p for p in (ROOT / "third_party").rglob("*") if p.is_file() and "__pycache__" not in p.parts]]
     with zipfile.ZipFile(output / filename, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(files):

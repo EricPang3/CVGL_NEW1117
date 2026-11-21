@@ -1,0 +1,8 @@
+﻿path,bytes,sha256,status,reason
+/root/autodl-tmp/CVGL_NEW/outputs/_server_smoke_sues200_20261117_165739/model.pth,350383630,2d8a2f4bf6b99cfc15ad1932e57fcab47fc982613d7ff2cc1a547c59d867162d,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/_server_smoke_u1652_20261117_165739/model.pth,350382286,fe29ead86afe821216eaa5a26b95f0220e206ea740dcbb247709e8eb239ccf26,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/full_20261117_full_seed1_sues200_150/model.pth,350383566,6f78c53656987ae6836e7eba7e0002b2168db2b319295d3e560cfa49ff8acada,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/full_20261117_full_seed1_sues200_200/model.pth,350383566,4731f1e184aac4be9dcabf88fb6a4d8741c6723751c127ece43c2fbd48af44b6,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/full_20261117_full_seed1_sues200_250/model.pth,350383566,53c01d3015842007b573ee1173639e3e386bd00f64a6866a6c5fda4c9f5a7627,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/full_20261117_full_seed1_sues200_300/model.pth,350383566,cb816ca49fe1c43600d19c88c58486eda9da9b56e0b297b411a7e48114277c6c,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
+/root/autodl-tmp/CVGL_NEW/outputs/full_20261117_full_seed1_u1652/model.pth,350391694,c06f95445ebb300bd43eb0abec8386b8081f52ce97d7d318280cecf164a6e502,deleted,superseded recipe or smoke test; current seed1/2 baseline is retained
