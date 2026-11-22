@@ -44,4 +44,5 @@ modules20261120_seed2,2,wtconv,10,4,3,3
 modules20261120_seed2,2,dwconv,10,2,6,2
 modules20261120_seed2,2,dwconv_budget,10,3,4,3
 modules20261120_seed2,2,boq,10,2,5,3
-modules20261120_seed2,2,fcanet,6,2,3,1
+modules20261120_seed2,2,fcanet,10,2,4,4
+modules20261120_seed2,2,fcanet_dc,8,3,3,2
