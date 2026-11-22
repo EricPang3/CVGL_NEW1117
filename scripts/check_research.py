@@ -39,6 +39,7 @@ def main():
     batch = config["batch_size"] if device.type == "cuda" else 2
     checks = {}
     for name in [*FEATURE_MODULES, *["aux:" + a for a in AUXILIARIES[1:]]]:
+        module = None
         try:
             module = (TrainingObjective(name[4:], 1024) if name.startswith("aux:") else make_module(name)[0]).to(device)
             for amplitude in (1.0, 32.0):

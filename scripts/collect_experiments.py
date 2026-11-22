@@ -32,12 +32,12 @@ terminal=state.get('status') in ('complete','partial_failure','budget_reached')
 paths=[(f,f.name,state.get('jobs',{}).get(f.stem,{}).get('status') in ('complete','failed') or terminal) for f in p.glob('*.log')]
 protocol=yaml.safe_load((p/'protocol.yaml').read_text()) if (p/'protocol.yaml').exists() else {}
 baseline=p.parent/protocol.get('baseline_run','matrix20261120_none')
-if (baseline/'run.log').exists():paths.append((baseline/'run.log','baseline_run.log',True))
+if state.get('schema')!='cvgl_research_v1' and (baseline/'run.log').exists():paths.append((baseline/'run.log','baseline_run.log',True))
 launcher=p.parent/(name+'.launch.log')
 if launcher.exists():paths.append((launcher,'suite_launcher.log',terminal))
 for f,label,complete in paths:
  info=f.stat();logs.append({'path':str(f),'name':label,'size':info.st_size,'mtime':info.st_mtime_ns,'sha256':hashlib.sha256(f.read_bytes()).hexdigest() if complete else None})
-summary=[n for n in ('commands.jsonl','metrics.csv','protocol.yaml','gpu_preflight.json') if (p/n).is_file()]
+summary=[n for n in ('commands.jsonl','metrics.csv','protocol.yaml','gpu_preflight.json','weight_cleanup.jsonl','source.zip','shutdown.json') if (p/n).is_file()]
 print(json.dumps({'state':state,'ready':ready,'logs':logs,'summary_files':summary}))
 '''
 
@@ -108,11 +108,17 @@ def dashboard(directory, remote, manifest):
     rows = []
     for row in results:
         label = "u1652" if row["dataset"] == "U1652" else f'sues200_{row["altitude"]}'
-        job = f'{row["module"]}_{label}'
+        job = row.get("artifact_job", f'{row["module"]}_{label}')
         url = f'artifacts/{job}/{row["direction"]}/report/index.html'
         entry = manifest["artifacts"].get(job, {})
         current = entry.get("checkpoint_sha256") == row.get("checkpoint_sha256")
-        link = f'<a href="{url}">{html.escape(row["module"])}</a>' if entry and current else html.escape(row["module"])
+        title = html.escape(row.get("variant", row["module"]))
+        if "phase" in row:
+            title += f' ({html.escape(row["phase"])}, s{row["seed"]}, {html.escape(row["gallery_scope"])})'
+            if row["gallery_scope"] == "all":
+                url = f'artifacts/{job}/all/{row["direction"]}/report/index.html'
+        available = (directory / url).is_file() if "artifact_job" in row else True
+        link = f'<a href="{url}">{title}</a>' if entry and current and available else title
         cells = [link, html.escape(row["kind"]), html.escape(row["dataset"]), str(row["altitude"] or "—"), row["direction"],
                  f'{row["recall@1"]:.4f}', f'{row["mAP"]:.4f}', f'{row["delta_R1_pp"]:+.4f}', f'{row["delta_AP_pp"]:+.4f}',
                  str(row.get("fixed_queries", "—")), str(row.get("regressed_queries", "—")), str(row.get("extra_parameters", "—")),
@@ -120,9 +126,12 @@ def dashboard(directory, remote, manifest):
         rows.append('<tr>' + ''.join('<td>'+c+'</td>' for c in cells) + '</tr>')
     status = html.escape(str(remote.get("status")))
     active = html.escape(str(remote.get("active", "")))
-    page = '<!doctype html><meta charset="utf-8"><title>33模块实验总览</title><style>body{font-family:system-ui;padding:24px;color:#243543}table{border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid #ddd;text-align:left}input{padding:10px;width:350px}a{color:#176b75}</style>'
-    page += f'<h1>33模块实验总览</h1><p>运行：{html.escape(directory.name)}；seed：{remote.get("seed", 1)}；状态：{status}；当前：{active}</p><p>真实评估 {len(results)}/370；本地已归档 {len(manifest["artifacts"])}/{remote.get("expected_archive_tasks", 190)} 个任务。点击已归档模块看案例；分数为百分比，差值为百分点。</p>'
-    page += '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重按configs/checkpoint_retention.json保留；discarded_by_policy表示只保留结果，shared_baseline表示共用baseline权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>'
+    research = remote.get("schema") == "cvgl_research_v1"
+    heading = "研究候选实验总览" if research else "33模块实验总览"
+    count = f'{len(results)}（开发/复验/测试分别列出）' if research else f'{len(results)}/370'
+    page = f'<!doctype html><meta charset="utf-8"><title>{heading}</title><style>body{{font-family:system-ui;padding:24px;color:#243543}}table{{border-collapse:collapse}}td,th{{padding:8px;border-bottom:1px solid #ddd;text-align:left}}input{{padding:10px;width:350px}}a{{color:#176b75}}</style>'
+    page += f'<h1>{heading}</h1><p>运行：{html.escape(directory.name)}；状态：{status}；当前：{active}</p><p>真实评估 {count}；本地已归档 {len(manifest["artifacts"])}/{remote.get("expected_archive_tasks", 190)} 个已完成任务。点击有链接的模块看案例；分数为百分比，差值为百分点。</p>'
+    page += ('<p>仅开发集决定晋级；官方测试按预注册矩阵执行。有提升的开发项与最终矩阵生成案例；其余完整逐图结果在queries.json。落选权重由服务器验证归档后清理；最终seed1权重额外下载到本地，保留SHA。不同图库、阶段不混比。</p>' if research else '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重按configs/checkpoint_retention.json保留；discarded_by_policy表示只保留结果，shared_baseline表示共用baseline权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>')
     page += '<input placeholder="筛选模块、数据集或方向" oninput="for(const r of document.querySelectorAll(\'tbody tr\'))r.hidden=!r.textContent.toLowerCase().includes(this.value.toLowerCase())">'
     page += '<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('模块','类型','数据集','高度','方向','R@1','AP','ΔR@1','ΔAP','修好','退步','额外参数','权重状态'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
     page += '<p>状态与命令：state.json、commands.jsonl；归档清单：archive_manifest.json。单seed差异不能证明稳定增益；人工查看案例用于形成假设。</p>'
@@ -169,7 +178,15 @@ def main(argv=None, on_poll=None):
             save(directory / "state.json", remote)
             if on_poll is not None:
                 on_poll(remote)
-            export_tables(ROOT)
+            research = remote.get("schema") == "cvgl_research_v1"
+            if research:
+                try:
+                    from scripts.research_records import export_research
+                except ModuleNotFoundError:
+                    from research_records import export_research
+                export_research(remote, args.run, ROOT)
+            else:
+                export_tables(ROOT)
             for ready in polled["ready"]:
                 job = ready["job"]
                 if Path(job).name != job:
@@ -185,7 +202,8 @@ def main(argv=None, on_poll=None):
                 if file_hash(bundle) != ready["bundle_sha256"]:
                     raise RuntimeError(f"结果包校验失败：{job}")
                 retain_weight = keep_checkpoint(policy, remote.get("jobs", {}).get(job), ready)
-                if ready["archive_checkpoint"] and retain_weight:
+                research_weight = research and ready.get("phase") == "final" and ready.get("seed") == remote.get("final_seeds", [1])[0] and ready.get("checkpoint_storage") == "retained_on_server"
+                if (ready["archive_checkpoint"] and retain_weight) or research_weight:
                     weight = target / "model.pth"
                     if not weight.exists() or file_hash(weight) != ready["checkpoint_sha256"]:
                         download(ready["checkpoint"], weight)
@@ -196,7 +214,7 @@ def main(argv=None, on_poll=None):
                         if not (target / member.name).resolve().is_relative_to(target.resolve()) or member.issym() or member.islnk():
                             raise RuntimeError("结果包出现非法路径")
                     archive.extractall(target)
-                for direction in ("D2S", "S2D"):
+                for direction in (("D2S", "S2D", "all/D2S", "all/S2D") if research else ("D2S", "S2D")):
                     report_zip = target / direction / "report.zip"
                     if report_zip.is_file():
                         with zipfile.ZipFile(report_zip) as archive:
@@ -210,7 +228,7 @@ def main(argv=None, on_poll=None):
                         (target / "model.pth").unlink(missing_ok=True)
                         (target / "model.pth.partial").unlink(missing_ok=True)
                 else:
-                    ready["checkpoint_storage"] = "shared_baseline"
+                    ready["checkpoint_storage"] = "retained_locally_and_on_server" if research_weight else ready.get("checkpoint_storage", "shared_baseline")
                 ready["checkpoint_retention_policy_sha256"] = policy_hash
                 ready["local_directory"] = str(target)
                 ready["run"] = args.run
@@ -243,7 +261,10 @@ def main(argv=None, on_poll=None):
                 for name in polled["summary_files"]:
                     download(f"/root/autodl-tmp/CVGL_NEW/outputs/{args.run}/{name}", directory / name)
                 if remote["status"] in ("complete", "budget_reached") and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 190):
-                    export_tables(ROOT)
+                    if not research:
+                        export_tables(ROOT)
+                    if research:
+                        command("from pathlib import Path; import sys,json; a=json.loads(sys.argv[1]); p=Path('/root/autodl-tmp/CVGL_NEW/outputs')/a['run']; (p/'local_archive_verified.json').write_text(json.dumps(a))", {"run": args.run, "artifacts": len(manifest["artifacts"]), "verified_at": time.time()})
                     if args.shutdown_when_complete:
                         subprocess.run([*ssh, "/bin/bash /usr/bin/shutdown"], check=True, timeout=120)
                         manifest["shutdown"] = "requested_after_verified_local_archive"
@@ -252,6 +273,9 @@ def main(argv=None, on_poll=None):
                     return
                 if remote["status"] == "partial_failure":
                     print("有失败任务，保留运行环境，等待修复续跑：", remote.get("failures"), flush=True)
+                    if research and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 0):
+                        print("研究队列失败记录已收齐；修复续跑后重新启动接收。", flush=True)
+                        return
             manifest["last_poll"] = time.time()
             manifest.pop("last_error", None)
             save(manifest_file, manifest)

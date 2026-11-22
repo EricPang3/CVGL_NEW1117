@@ -109,9 +109,11 @@ class Campaign:
             "schema": "cvgl_research_v1", "started_at": now(), "jobs": {}, "results": [], "events": [],
             "config_sha256": config_hash, "code_sha256": code_hash, "hours": hours,
             "deadline": (datetime.now(timezone.utc) + timedelta(hours=hours)).isoformat()}
+        self.already_complete = self.state.get("status") == "complete" and not retry_failed
         if self.state["config_sha256"] != config_hash or self.state["hours"] != hours:
             raise ValueError("续跑配置/预算改变，请新建运行名；不会静默延长预算")
         if self.state["code_sha256"] != code_hash:
+            self.already_complete = False
             if not repair_note:
                 raise ValueError("源码改变；修复续跑需--repair-note说明原因，或使用新运行名")
             self.state["events"].append({"at": now(), "type": "code_repair", "old": self.state["code_sha256"], "new": code_hash, "note": repair_note})
@@ -124,6 +126,7 @@ class Campaign:
         self.environment = {**os.environ, "CVGL_DATA_ROOT": str(Path(data_root).expanduser().resolve()),
                             "HF_HUB_OFFLINE": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"}
         self.state.update(status="running", active=None)
+        self.state["final_seeds"] = self.config.get("final_seeds", [1])
         if retry_failed:
             for record in self.state["jobs"].values():
                 if record.get("status") == "failed":
@@ -269,6 +272,13 @@ class Campaign:
                         "delta_R1_pp": delta_r1, "delta_AP_pp": delta_ap, "fixed_queries": comparison["counts"]["fixed"],
                         "regressed_queries": comparison["counts"]["regressed"], "extra_parameters": metrics["extra_parameters"],
                         "training_only_parameters": metrics.get("training_only_parameters", 0), "checkpoint_sha256": record["checkpoint_sha256"]}
+                    with (model_dir / "train.csv").open(newline="") as stream:
+                        history = list(csv.DictReader(stream))
+                    row.update(epochs=len(history), batch_size=self.config["batch_size"], img_size=self.config["img_size"],
+                        train_seconds=sum(float(r["seconds"]) for r in history),
+                        amp_skipped_steps=sum(int(r["amp_skipped_steps"]) for r in history),
+                        peak_training_gpu_mb=max(float(r["peak_gpu_mb"]) for r in history),
+                        development_partition_sha256=metrics["protocol"].get("development_partition_sha256"))
                     rows = self.state["results"]
                     rows[:] = [r for r in rows if (r["artifact_job"], r["gallery_scope"], r["direction"]) != (job, scope, direction)]
                     rows.append(row)
@@ -306,6 +316,10 @@ class Campaign:
                 self.prune(job)
 
     def execute(self):
+        if self.already_complete:
+            self.state["status"] = "complete"
+            self.save()
+            return
         try:
             self.boundary()
             if not self.state.get("preflight_passed"):
@@ -343,6 +357,10 @@ class Campaign:
                 ranking, finalists = [], []
             self.state.update(confirmation_selection=ranking, finalists=finalists)
             self.save()
+            # 最终模型从ImageNet重新使用完整训练集；开发阶段权重不再被后续任务引用。
+            for job, record in self.state["jobs"].items():
+                if record["phase"] in ("screen", "confirm"):
+                    self.prune(job)
             # 官方测试无论好坏均记录；不再由它决定新增候选或调参。
             if finalists:
                 for seed in self.config["final_seeds"]:
@@ -371,6 +389,7 @@ def main():
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--repair-note", help="明确记录源码修复；保留旧源码快照，不延长截止时间")
     parser.add_argument("--shutdown", action="store_true", help="终止时先验证全部成功任务归档，然后请求AutoDL关机")
+    parser.add_argument("--shutdown-grace-seconds", type=int, default=600, help="最多等本地归档确认的秒数；离线也按有限等待后关机，结果留在数据盘")
     args = parser.parse_args()
     config = yaml.safe_load(Path(args.config).read_text())
     if args.plan:
@@ -382,6 +401,8 @@ def main():
         return
     if args.hours is None or not 0 < args.hours <= 168:
         parser.error("执行必须显式指定0–168小时内的--hours预算；无默认无限运行")
+    if not 0 <= args.shutdown_grace_seconds <= 3600:
+        parser.error("shutdown-grace-seconds必须在0–3600之间")
     (ROOT / "outputs").mkdir(exist_ok=True)
     with (ROOT / "outputs/.research_gpu.lock").open("a+") as lock:
         try:
@@ -396,6 +417,9 @@ def main():
                     ready = json.loads((campaign.directory / "archive_ready" / f"{job}.json").read_text())
                     if digest(ready["bundle"]) != ready["bundle_sha256"]:
                         raise RuntimeError("归档验证失败，暂不关机")
+            wait_until = time.monotonic() + args.shutdown_grace_seconds
+            while not (campaign.directory / "local_archive_verified.json").exists() and time.monotonic() < wait_until:
+                time.sleep(min(30, max(0, wait_until - time.monotonic())))
             atomic_json(campaign.directory / "shutdown.json", {"at": now(), "reason": campaign.state["status"],
                         "location": "server_data_disk_archives", "local_download_verified": False})
             subprocess.run(["/bin/bash", "/usr/bin/shutdown"], check=True)

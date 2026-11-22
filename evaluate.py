@@ -22,7 +22,7 @@ def main():
     parser.add_argument("--data-root")
     parser.add_argument("--gallery-scope", choices=["all", "query_ids"])
     parser.add_argument("--split", dest="eval_split", choices=["test", "development"], default="test")
-    parser.add_argument("--development-fraction", type=float, help="裸权重开发集评估需指定与训练一致的划分")
+    parser.add_argument("--development-fraction", type=float, help="开发评估划分必须与权重的训练元数据一致")
     parser.add_argument("--development-seed", type=int)
     parser.add_argument("--module", help="默认恢复权重模块；裸基线权重仅允许额外启用无训练的 burst_gap")
     parser.add_argument("--module-alpha", type=float)
@@ -36,7 +36,7 @@ def main():
     state, saved = load_weights(checkpoint)
     config = experiment_config(args, saved)
     # --dataset/--config可以切换数据路径，模型结构必须从权重恢复。
-    for key in ("module", "module_alpha"):
+    for key in ("module", "module_alpha", "development_fraction", "development_seed"):
         if getattr(args, key) is None and key in saved:
             config[key] = saved[key]
     for key in ("mean", "std", "img_size"):
@@ -76,6 +76,8 @@ def main():
                    "evaluated_at": datetime.now().astimezone().isoformat()})
     if config["eval_split"] == "development":
         from sample4geo.dataset.development import development_partition
+        if not saved.get("development_partition") or not saved.get("training_ids"):
+            parser.error("权重缺少训练/开发地点元数据，不能验证开发集无泄漏；请重新按开发划分训练")
         partition = development_partition(config)
         if saved.get("development_partition") and partition != saved["development_partition"]:
             parser.error("评估开发划分与权重训练时划分不一致")

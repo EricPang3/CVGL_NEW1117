@@ -106,6 +106,10 @@ python -m unittest discover -s tests -v
 
 权重按 `configs/checkpoint_retention.json` 保留，清单见 `results/checkpoint_retention.csv`；baseline、最优候选和关键对照保留，其余只保留指标、逐图结果、报告和源码。`python scripts/experiment_records.py` 仅导表，增加 `--apply` 才清理已完成且记录完整的本地权重；手动清理前先停止接收程序，避免同时写归档清单。删除历史见 `results/weight_cleanup.csv`，实际可用权重见 `results/checkpoint_inventory.csv`。
 
-当前批次可在服务器运行 `python scripts/run_overnight.py --until 2026-11-21T12:00:00+08:00`：等待原矩阵完成后，按原顺序使用seed2、3…补充验证，每个seed独立训练对应baseline。时间到后只停止新增补充任务，当前任务正常完成；原矩阵继续优先完整执行。
+历史批次曾使用`python scripts/run_overnight.py --until 2026-11-21T12:00:00+08:00`补seed复验，该截止时间已经结束。以下旧接收说明仅供历史复查；新实验使用下方研究队列，不重启过期夜间计划。
 
 本地运行 `python scripts/collect_overnight.py --host root@服务器 --port SSH端口 --shutdown` 跟随服务器计划。复用当前SSH控制连接，不保存密码；本地电脑和网络须保持在线。总入口为 `outputs/overnight20261120/index.html`。所有已完成任务下载并校验、且预算时间已到后才请求关机；失败时保留环境。请避免同时启动原单矩阵的 `--shutdown-when-complete` 接收程序。
+
+## 新研究队列（2026-11-22）
+
+自动接入候选、开发集筛查、配对复验与完整矩阵见[README_RESEARCH.md](README_RESEARCH.md)。AI续接先读[AGENTS.md](AGENTS.md)与[RESEARCH_STATE.md](RESEARCH_STATE.md)。这是新增的显式研究流程；原三个入口与默认S4G baseline继续保留。

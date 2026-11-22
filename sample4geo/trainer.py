@@ -28,7 +28,7 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
     skipped, first_lr = 0, optimizer.param_groups[0]["lr"]
-    for satellite, drone, _ in tqdm(loader, desc=f"Epoch {epoch}"):
+    for step, (satellite, drone, places) in enumerate(tqdm(loader, desc=f"Epoch {epoch}"), 1):
         last_lr = optimizer.param_groups[0]["lr"]
         satellite, drone = satellite.to(device), drone.to(device)
         optimizer.zero_grad(set_to_none=True)
@@ -42,7 +42,8 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
                 sat_features, drone_features = model(satellite, drone)
                 loss = criterion(sat_features, drone_features, model.logit_scale.exp())
         if not torch.isfinite(loss):
-            raise RuntimeError(f"Epoch {epoch} 出现非有限 loss")
+            components = f", main={main_loss.item()}, auxiliary={auxiliary_loss.item()}" if config.get("auxiliary", "none") != "none" else ""
+            raise RuntimeError(f"Epoch {epoch} step {step} 非有限loss={loss.item()}{components}, places={places}, logit_scale={model.logit_scale.exp().item()}")
         scaler.scale(loss).backward()
         if config["clip_grad"]:
             scaler.unscale_(optimizer)
