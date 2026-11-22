@@ -34,8 +34,16 @@
 
 - 旧端口22352已停止。当前SSH：connect.bjb1.seetacloud.com:43322；数据完整，启动前约19GiB可用。密码不得写入本文件；本地复用socket为/tmp/cvgl-ssh-43322。
 - 2026-11-22用户再次明确要求“继续跑实验”，已启动此前推荐的24小时有限队列，无需继续等待预算确认。运行research20261122，北京时间11月22日12:20:47启动，11月23日12:20:47后不开始新任务；当前任务完成并验证归档后关机，若矩阵提前完成则提前结束。不是保证恰在截止时刻关机。
-- 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。新候选尚无正式GPU训练/测试指标。
+- 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。本轮已产生真实开发集指标，尚未进入官方测试矩阵；不把开发分数与论文官方分数混比。
 - c24a718已推送GitHub同名研究分支；AutoDL原Python3.10/torch2.1.2+cu118环境48项完整回归通过。部署记录和服务器测试日志在outputs/research20261122_preflight；后续接收策略指纹修正有单独Git提交，不改变模型/训练公式。
 - 本次算法与编排提交dd015ff已同时在本地、GitHub、服务器；只更新维护文档不改变state中的code_sha256。服务器驱动PID3017，启动参数--hours 24 --shutdown，启动记录outputs/research20261122.launch.json，日志同名.launch.log。本地接收PID162552，记录outputs/research20261122/receiver_launch.json，日志receiver.log。PID须结合实际进程核对，不能只相信旧数字。
 - 最新状态以服务器outputs/research20261122/state.json与本地接收副本为准；启动时尚无本轮精度指标。启动预检通过后按固定顺序执行34次开发训练及按规则晋级的复验/完整矩阵。发现failed时先看逐任务日志并保留原记录，再登记repair-note续跑；不要重开过期夜间计划，不要重复启动持锁队列。
 - 本文件中的“计划”须随实际完成更新，维护实际代码提交、验证日志、活动队列名与未解决问题，保证上下文丢失后能继续。
+
+## 2026-11-22 13:46 检查快照
+
+- 队列running，完成11/34组开发筛查任务（含2组baseline），已有22项方向评估；4个候选已完成双数据集，第5个visible_consensus正在训练SUES150m。驱动与本地接收均存活，11包均已本地归档，无接收错误。磁盘约15GiB可用，无失败任务，已完成训练AMP跳步均0。
+- 本轮开发集baseline：U1652 D2S R1/AP97.2222/97.6941，S2D95.7143/96.8663；SUES150m D2S97.9167/98.3993，S2D100/97.2706。均2epoch、seed1，非官方测试。
+- visible_consensus在U1652：D2S98.7566/98.8661（R1+1.5344pp、AP+1.1719pp），S2D98.5714/98.1926（R1+2.8571pp、AP+1.3263pp）。SUES尚在跑；不能据此宣布跨数据集稳定有效或SOTA。
+- 完成四个方向的候选开发平均AP变化：consensus+0.9508pp，prototype_pool+0.9788pp，prototype_graph+0.5166pp，prototype_dustbin+0.1862pp。graph在U D2S R1-0.9259pp，dustbin在SUES S2D R1-4.1667pp；保留负结果，不只报局部最好项。候选顺序和晋级规则不变，尚未开始seed2复验。
+- 不可变CSV快照results/research20261122/status_20261122_1346.csv；持续更新主表为metrics.csv。完整原始/案例在outputs/research20261122/artifacts与index.html。
