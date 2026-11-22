@@ -34,7 +34,7 @@
 
 - 旧端口22352已停止。当前SSH：connect.bjb1.seetacloud.com:43322；数据完整，启动前约19GiB可用。密码不得写入本文件；本地复用socket为/tmp/cvgl-ssh-43322。
 - 2026-11-22用户再次明确要求“继续跑实验”，已启动此前推荐的24小时有限队列，无需继续等待预算确认。运行research20261122，北京时间11月22日12:20:47启动，11月23日12:20:47后不开始新任务；当前任务完成并验证归档后关机，若矩阵提前完成则提前结束。不是保证恰在截止时刻关机。
-- 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。本轮已产生真实开发集指标，尚未进入官方测试矩阵；不把开发分数与论文官方分数混比。
+- 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。本轮16候选初筛和seed2开发复验已完成，已进入官方测试矩阵；不把开发分数与论文官方分数混比。
 - c24a718已推送GitHub同名研究分支；AutoDL原Python3.10/torch2.1.2+cu118环境48项完整回归通过。部署记录和服务器测试日志在outputs/research20261122_preflight；后续接收策略指纹修正有单独Git提交，不改变模型/训练公式。
 - 本次算法与编排提交dd015ff已同时在本地、GitHub、服务器；只更新维护文档不改变state中的code_sha256。服务器驱动PID3017，启动参数--hours 24 --shutdown，启动记录outputs/research20261122.launch.json，日志同名.launch.log。本地接收PID162552，记录outputs/research20261122/receiver_launch.json，日志receiver.log。PID须结合实际进程核对，不能只相信旧数字。
 - 最新状态以服务器outputs/research20261122/state.json与本地接收副本为准；启动时尚无本轮精度指标。启动预检通过后按固定顺序执行34次开发训练及按规则晋级的复验/完整矩阵。发现failed时先看逐任务日志并保留原记录，再登记repair-note续跑；不要重开过期夜间计划，不要重复启动持锁队列。
@@ -47,3 +47,13 @@
 - visible_consensus在U1652：D2S98.7566/98.8661（R1+1.5344pp、AP+1.1719pp），S2D98.5714/98.1926（R1+2.8571pp、AP+1.3263pp）。SUES尚在跑；不能据此宣布跨数据集稳定有效或SOTA。
 - 完成四个方向的候选开发平均AP变化：consensus+0.9508pp，prototype_pool+0.9788pp，prototype_graph+0.5166pp，prototype_dustbin+0.1862pp。graph在U D2S R1-0.9259pp，dustbin在SUES S2D R1-4.1667pp；保留负结果，不只报局部最好项。候选顺序和晋级规则不变，尚未开始seed2复验。
 - 不可变CSV快照results/research20261122/status_20261122_1346.csv；持续更新主表为metrics.csv。完整原始/案例在outputs/research20261122/artifacts与index.html。
+
+## 2026-11-22 19:27 正式测试检查与配方问题
+
+- 服务器running：34/34组开发筛查、8/8组seed2开发复验完成；正式矩阵13/45组完成，总计55组完成、130项评估。当前final_s1_visible_consensus_sues200_300/train。无失败，数据盘约10.73GiB可用，截止仍为11月23日12:20:47后停止新增任务。
+- 复验通过visible_consensus与wt_consensus；prototype_pool开发seed1平均AP+0.9788pp，seed2-0.5711pp，不满足各seed均为正的规则，未晋级。visible两开发seed平均AP+0.7840pp、WT共识+0.7433pp；这些是开发分数，不是官方测试。
+- 官方U1652 seed1、3epoch、query_ids：baseline D2S R1/AP90.2787/91.7819，S2D93.5806/89.2782；visible90.8440/92.2795、94.1512/90.3122；WT共识91.5440/92.8462、93.5806/90.4195。当前相对本轮baseline有局部增益，但都未超过旧1epoch baseline的U1652 R1（92.4079/94.5792）。不能宣布已超过原baseline或强方法。
+- SUES150m WT共识官方D2S R1从94.00到95.95（+1.95pp），S2D93.75到96.25（+2.50pp）；SUES200m其D2S/S2D R1反而-0.575/-1.25pp。SUES250m visible在query_ids D2S+0.525pp，在all图库D2S-0.55pp；不同图库分开报告，保留负结果。
+- 已只读核对旧1epoch与本轮3epoch baseline配置：训练701地点完全一致，训练两视角清单指纹、查询/图库清单指纹、评估protocol均相同，关键训练配方差异是epochs1→3及对应cosine总步数。新增none/auxiliary/development_fraction为默认元数据，无有效分支。训练预算/调度可能导致退化，尚未证明过拟合或实现bug；不要据官方测试结果临时改正在跑的预注册矩阵。下一轮若验证轮数/调度须单列对照，不覆盖本轮结果。
+- 本地接收存活、无记录错误，因下载最终seed1大权重，状态和案例归档可落后服务器数分钟。已观察model.pth.partial持续写入，不应因此误判训练停止。共享SSH复用连接查询曾延迟；已另建短期只读监控socket /tmp/cvgl-status-43322，过期需重新登录，不要随意杀主接收连接。
+- 完整最新快照results/research20261122/status_20261122_1927.csv，服务器状态副本outputs/research20261122/observations/state_20261122_1927.json。当前仍只有seed1官方结果，后续seed2/3官方测试未完成。
