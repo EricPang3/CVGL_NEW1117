@@ -17,7 +17,7 @@
 - 已核对GeoCoM、MGS²-Net、SkyPart等近期论文，原报指标/协议/代码状态保存在results/literature_20261121.csv。GeoCoM当前只有README；MGS²代码链接为空。自写适配不能冒充作者完整复现。
 - SkyPart文档的SUES训练1–120/测试121–200以及full200图库，与本项目CAMP划分/query_ids不同，不能直接混比分数或只换测试集评旧权重。
 
-## 新一轮实现与计划（GPU新指标尚未产生）
+## 新一轮实现与运行
 
 1. 已实现训练地点20%开发集，固定split seed20261122与ID/hash；默认官方独立评估仍不访问训练图片，显式--split development才使用开发集。
 2. 已接入9种特征头/对照：prototype_pool/graph/dustbin、scale_gate/uniform、frequency_gate/spatial_smooth、wt_proto_graph/dw_proto_graph。均保留GAP旁路。
@@ -30,11 +30,12 @@
 9. 本地接收沿用scripts/collect_experiments.py，自动识别cvgl_research_v1；分阶段导results/research20261122表格，完整图库另页，最终seed1权重下载。后续seed候选只保留完整结果。开发晋级结束后释放不再被引用的开发候选权重，baseline保护。
 10. 最终空间检查发现报告解压目录会再复制完整queries（旧U1652 D2S约128MiB）。新驱动校验tar.gz后去掉重复报告/zip与非baseline原始queries，完整内容留包、本地正常解包；baseline queries保留供比较。重写权重删除记录时合并旧包内容，不能丢掉已收纳的报告。
 
-## 当前阻塞及下一步
+## 当前运行与续接
 
-- 旧端口22352已停止。用户提供新SSH：connect.bjb1.seetacloud.com:43322；已连接并部署研究分支，数据完整，GPU预检完成后4090空闲，数据盘约19GiB可用。密码不得写入本文件；本地复用socket为/tmp/cvgl-ssh-43322。
-- 长队列预算仍待用户选择（24/48小时或仅准备）；此前已异步询问。先部署和GPU预检，不擅自将无回复当作预算批准。
+- 旧端口22352已停止。当前SSH：connect.bjb1.seetacloud.com:43322；数据完整，启动前约19GiB可用。密码不得写入本文件；本地复用socket为/tmp/cvgl-ssh-43322。
+- 2026-11-22用户再次明确要求“继续跑实验”，已启动此前推荐的24小时有限队列，无需继续等待预算确认。运行research20261122，北京时间11月22日12:20:47启动，11月23日12:20:47后不开始新任务；当前任务完成并验证归档后关机，若矩阵提前完成则提前结束。不是保证恰在截止时刻关机。
 - 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。新候选尚无正式GPU训练/测试指标。
 - c24a718已推送GitHub同名研究分支；AutoDL原Python3.10/torch2.1.2+cu118环境48项完整回归通过。部署记录和服务器测试日志在outputs/research20261122_preflight；后续接收策略指纹修正有单独Git提交，不改变模型/训练公式。
-- 当前尚未启动research20261122长队列。预算确定后按README_RESEARCH.md启动服务器驱动与本地接收；不需要再次接模块。全流程使用同提交部署，具体SHA查Git和outputs/research20261122_preflight/deployment.json。旧中午截止不可复用。
+- 本次算法与编排提交dd015ff已同时在本地、GitHub、服务器；只更新维护文档不改变state中的code_sha256。服务器驱动PID3017，启动参数--hours 24 --shutdown，启动记录outputs/research20261122.launch.json，日志同名.launch.log。本地接收PID162552，记录outputs/research20261122/receiver_launch.json，日志receiver.log。PID须结合实际进程核对，不能只相信旧数字。
+- 最新状态以服务器outputs/research20261122/state.json与本地接收副本为准；启动时尚无本轮精度指标。启动预检通过后按固定顺序执行34次开发训练及按规则晋级的复验/完整矩阵。发现failed时先看逐任务日志并保留原记录，再登记repair-note续跑；不要重开过期夜间计划，不要重复启动持锁队列。
 - 本文件中的“计划”须随实际完成更新，维护实际代码提交、验证日志、活动队列名与未解决问题，保证上下文丢失后能继续。

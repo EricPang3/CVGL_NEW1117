@@ -1,6 +1,6 @@
 # CVGL_NEW：AI 维护契约
 
-> 2026-11-22最新任务：继续自动模块筛查并对标近期强方法，用户偏好先涨点、后分析。续接先读AGENTS.md与RESEARCH_STATE.md。新服务器43322已连接，数据/4090可用；长队列24/48小时预算待用户选择。原baseline契约只约束显式none路径，新候选允许训练期辅助分支与已记录的头部适配；新队列configs/research_campaign.yaml，思想来源configs/research_sources.yaml。
+> 2026-11-22最新任务：用户再次要求继续，research20261122已于北京时间12:20:47启动，采用推荐24小时上限，次日12:20:47后不启动新任务，当前任务归档后关机。新服务器43322，本地接收已启动。续接先读AGENTS.md与RESEARCH_STATE.md，实时状态看outputs/research20261122/state.json。原baseline契约只约束显式none路径；候选配置configs/research_campaign.yaml，来源configs/research_sources.yaml。不要再将“预算待确认”当作阻塞。
 
 > 2026-11-20：用户授权33模块完整矩阵。先读不可修改的《核心思想（AI必读）.md》、模块目录和EXPERIMENT_LOG.md。以下baseline契约适用于module=none；显式模块实验允许目录中的共享适配头，不能删除原GAP旁路。队列配置configs/module_suite.yaml，脚本scripts/module_suite.py，本地接收scripts/collect_experiments.py。真实完成状态看outputs/modules20261120/state.json，不要把已排队写成已完成。
 
