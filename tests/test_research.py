@@ -317,6 +317,9 @@ class ResearchTests(unittest.TestCase):
                 manifest = json.loads((local / "outputs/test/archive_manifest.json").read_text())
                 self.assertEqual(manifest["status"], "complete")
                 self.assertEqual(len(manifest["artifacts"]), 13)
+                item = manifest["artifacts"]["final_s1_good_u1652"]
+                self.assertEqual(item["checkpoint_retention_policy_sha256"], resumed.state["config_sha256"])
+                self.assertEqual(item["checkpoint_retention_code_sha256"], resumed.state["code_sha256"])
 
 
 if __name__ == "__main__":

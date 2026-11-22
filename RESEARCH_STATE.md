@@ -34,5 +34,6 @@
 - 旧端口22352已停止。用户提供新SSH：connect.bjb1.seetacloud.com:43322；已连接并部署研究分支，数据完整，GPU预检完成后4090空闲，数据盘约19GiB可用。密码不得写入本文件；本地复用socket为/tmp/cvgl-ssh-43322。
 - 长队列预算仍待用户选择（24/48小时或仅准备）；此前已异步询问。先部署和GPU预检，不擅自将无回复当作预算批准。
 - 本地新分支experiments/20261122-research-screen；6bf40ac单独保存上一轮最终表格。新候选尚无正式GPU训练/测试指标。
+- c24a718已推送GitHub同名研究分支；AutoDL原Python3.10/torch2.1.2+cu118环境48项完整回归通过。部署记录和服务器测试日志在outputs/research20261122_preflight；后续接收策略指纹修正有单独Git提交，不改变模型/训练公式。
 - 当前尚未启动research20261122长队列。预算确定后按README_RESEARCH.md启动服务器驱动与本地接收；不需要再次接模块。全流程使用同提交部署，具体SHA查Git和outputs/research20261122_preflight/deployment.json。旧中午截止不可复用。
 - 本文件中的“计划”须随实际完成更新，维护实际代码提交、验证日志、活动队列名与未解决问题，保证上下文丢失后能继续。

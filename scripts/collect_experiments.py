@@ -229,7 +229,10 @@ def main(argv=None, on_poll=None):
                         (target / "model.pth.partial").unlink(missing_ok=True)
                 else:
                     ready["checkpoint_storage"] = "retained_locally_and_on_server" if research_weight else ready.get("checkpoint_storage", "shared_baseline")
-                ready["checkpoint_retention_policy_sha256"] = policy_hash
+                ready["checkpoint_retention_policy_sha256"] = remote.get("config_sha256") if research else policy_hash
+                if research:
+                    ready["checkpoint_retention_code_sha256"] = remote.get("code_sha256")
+                    ready["checkpoint_retention_policy_source"] = "research_protocol_and_source"
                 ready["local_directory"] = str(target)
                 ready["run"] = args.run
                 # 结果包必须先校验；选中权重也必须本地校验。用户允许丢弃的权重由远端校验SHA后清理。
@@ -272,7 +275,7 @@ def main(argv=None, on_poll=None):
                     print("complete: local results", directory, flush=True)
                     return
                 if remote["status"] == "partial_failure":
-                    print("有失败任务，保留运行环境，等待修复续跑：", remote.get("failures"), flush=True)
+                    print("有失败任务，结果已保留：" if research else "有失败任务，保留运行环境，等待修复续跑：", remote.get("failures"), flush=True)
                     if research and len(manifest["artifacts"]) == remote.get("expected_archive_tasks", 0):
                         print("研究队列失败记录已收齐；修复续跑后重新启动接收。", flush=True)
                         return
