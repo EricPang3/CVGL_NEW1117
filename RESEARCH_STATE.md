@@ -28,6 +28,7 @@
 7. 服务器RTX4090预检已通过：14项特征图/辅助目标幅值1/32有限梯度检查，17个全模型（baseline＋16候选）物理B24/384四步优化检查均通过，最大19629.55MiB。算法预检提交33878df，JSON已在本地/服务器outputs/research20261122_preflight/保存。
 8. 真实数据五任务开发划分已核对：U1652训练561地点/30294对、开发140地点/7560无人机查询；SUES每高度训练96地点/4800对、开发24地点/1200查询。ID/hash保存同目录data_protocol.json。
 9. 本地接收沿用scripts/collect_experiments.py，自动识别cvgl_research_v1；分阶段导results/research20261122表格，完整图库另页，最终seed1权重下载。后续seed候选只保留完整结果。开发晋级结束后释放不再被引用的开发候选权重，baseline保护。
+10. 最终空间检查发现报告解压目录会再复制完整queries（旧U1652 D2S约128MiB）。新驱动校验tar.gz后去掉重复报告/zip与非baseline原始queries，完整内容留包、本地正常解包；baseline queries保留供比较。重写权重删除记录时合并旧包内容，不能丢掉已收纳的报告。
 
 ## 当前阻塞及下一步
 

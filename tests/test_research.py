@@ -278,6 +278,10 @@ class ResearchTests(unittest.TestCase):
                 second = root / "outputs/test_final_s2_good_u1652/model.pth"
                 self.assertFalse(second.exists())
                 self.assertTrue((root / "outputs/test_final_s2_baseline_u1652/model.pth").exists())
+                self.assertFalse((root / "outputs/test_final_s1_good_u1652/D2S/queries.json").exists())
+                self.assertFalse((root / "outputs/test_final_s1_good_u1652/D2S/report.zip").exists())
+                self.assertFalse((root / "outputs/test_final_s1_good_u1652/D2S/report").exists())
+                self.assertTrue((root / "outputs/test_final_s1_baseline_u1652/D2S/queries.json").exists())
                 before = (campaign.directory / "commands.jsonl").read_bytes()
                 resumed = Campaign(path, root, 1)
                 with patch("scripts.research_campaign.subprocess.run", side_effect=AssertionError("重复训练已完成任务")):
@@ -312,6 +316,7 @@ class ResearchTests(unittest.TestCase):
                     receiver.main(["--host", "root@fake", "--port", "22", "--socket", "/tmp/fake", "--run", "test"])
                 artifacts = local / "outputs/test/artifacts"
                 self.assertTrue((artifacts / "final_s1_good_sues200_150/all/D2S/report/index.html").is_file())
+                self.assertTrue((artifacts / "final_s1_good_u1652/D2S/queries.json").is_file())
                 self.assertTrue((artifacts / "final_s1_good_u1652/model.pth").is_file())
                 self.assertFalse((artifacts / "final_s2_good_u1652/model.pth").exists())
                 manifest = json.loads((local / "outputs/test/archive_manifest.json").read_text())

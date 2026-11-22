@@ -80,6 +80,7 @@ python evaluate.py --checkpoint outputs/proto_dev/model.pth \
 - `outputs/research20261122_<阶段>_s<seed>_<候选>_<任务>/`：config.yaml、train.csv、source.zip、权重，以及各方向metrics/queries。SUES完整图库结果位于`all/D2S`与`all/S2D`。
 - 所有成功任务先校验归档，落选权重才按策略清理；删除记录含SHA、字节数、原因和归档SHA。baseline权重受保护，最终seed1模型保留；之后seed的候选保留完整结果再释放权重。开发阶段滚动保留前4个候选的权重，晋级名单固定后释放开发候选权重；最终模型重新从ImageNet在完整训练集训练。
 - 小于3GiB可用空间时记录错误并停止，不等本地接收腾空间而长时间空转。不会删除不属于本队列的权重。
+- 服务器校验归档后移除重复的解压报告、report.zip和非baseline的原始queries副本，完整文件均在对应tar.gz中，见PACKED_RESULTS.json。baseline原始queries保留供同任务比较；本地接收会解出所有文件，案例功能不受影响。后续权重清理重写归档时会合并保留原包中的查询/报告。
 
 本地建立SSH复用连接（密码在终端输入，不写入命令/配置文件）：
 

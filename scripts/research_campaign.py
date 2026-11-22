@@ -13,6 +13,7 @@ import sys
 import tarfile
 import time
 import traceback
+from contextlib import ExitStack
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -173,11 +174,21 @@ class Campaign:
         model_dir = Path(record["model_dir"])
         bundle = self.directory / f"{job}.tar.gz"
         temporary = bundle.with_suffix(".tmp")
-        with tarfile.open(temporary, "w:gz", compresslevel=1) as archive:
+        with ExitStack() as resources:
+            previous = resources.enter_context(tarfile.open(bundle)) if bundle.exists() else None
+            archive = resources.enter_context(tarfile.open(temporary, "w:gz", compresslevel=1))
+            seen = set()
             for path in sorted(model_dir.rglob("*")):
                 relative = path.relative_to(model_dir)
                 if path.is_file() and path.suffix != ".pth" and "report" not in relative.parts and path.name != "model.tmp":
                     archive.add(path, arcname=relative.as_posix())
+                    seen.add(relative.as_posix())
+            # 原始查询/报告副本可能已压缩收纳；重写删除记录时保留旧包中的完整产物。
+            if previous is not None:
+                for member in previous.getmembers():
+                    if member.isfile() and member.name not in seen:
+                        with previous.extractfile(member) as stream:
+                            archive.addfile(member, stream)
         with tarfile.open(temporary) as archive:
             required = {"config.yaml", "source.zip", "train.csv", "D2S/metrics.json", "D2S/queries.json", "S2D/metrics.json", "S2D/queries.json"}
             if not required <= set(archive.getnames()):
@@ -194,6 +205,33 @@ class Campaign:
                  "checkpoint_storage": "retained_on_server" if (model_dir / "model.pth").is_file() else "discarded_on_server_after_records",
                  "phase": record["phase"], "seed": record["seed"], "variant": record["variant"]}
         atomic_json(self.directory / "archive_ready" / f"{job}.json", ready)
+
+    def compact(self, job):
+        """仅释放已校验归档的重复副本；baseline原始queries留给后续同任务比较。"""
+        record = self.state["jobs"][job]
+        ready = json.loads((self.directory / "archive_ready" / f"{job}.json").read_text())
+        if record["status"] != "complete" or digest(ready["bundle"]) != ready["bundle_sha256"]:
+            raise RuntimeError("完整归档未校验，不能压缩收纳原始副本")
+        model_dir = Path(record["model_dir"])
+        removed = []
+        for report in list(model_dir.rglob("report")):
+            if report.is_dir():
+                removed.append(report.relative_to(model_dir).as_posix() + "/")
+                shutil.rmtree(report)
+        patterns = ["report.zip"] + (["queries.json"] if record["variant"] != "baseline" else [])
+        with tarfile.open(ready["bundle"]) as archive:
+            contained = set(archive.getnames())
+        for pattern in patterns:
+            for path in model_dir.rglob(pattern):
+                relative = path.relative_to(model_dir).as_posix()
+                if relative not in contained:
+                    raise RuntimeError(f"归档缺少{relative}，拒绝删除副本")
+                path.unlink()
+                removed.append(relative)
+        atomic_json(model_dir / "PACKED_RESULTS.json", {"at": now(), "verified_bundle": ready["bundle"],
+                    "verified_bundle_sha256": ready["bundle_sha256"], "removed_duplicates": removed})
+        record["raw_compacted"] = True
+        self.save()
 
     def prune(self, job):
         record = self.state["jobs"][job]
@@ -294,6 +332,7 @@ class Campaign:
             self.save()
             if not development and seed != self.config["final_seeds"][0]:
                 self.prune(job)
+            self.compact(job)
             return True
         except Exception:
             record.update(status="failed", error=traceback.format_exc(), failed_at=now())
@@ -302,7 +341,8 @@ class Campaign:
             return False
 
     def selection(self, phases, arms):
-        return assess(self.state["results"], arms, phases, self.config["screen_tasks"],
+        complete = [r for r in self.state["results"] if self.state["jobs"].get(r["artifact_job"], {}).get("status") == "complete"]
+        return assess(complete, arms, phases, self.config["screen_tasks"],
                       self.config["minimum_gain_ap_pp"], self.config["maximum_dataset_r1_drop_pp"])
 
     def prune_screen(self, phase):
