@@ -31,6 +31,9 @@ class DepthwiseResidual(nn.Module):
 
 
 def make_module(name, channels=1024):
+    from .research_modules import FEATURE_MODULES, research_module
+    if name in FEATURE_MODULES:
+        return research_module(name, channels)
     if name == "burst_gap":
         return BurstGAP(), "enhancement", channels
     if name == "eca":

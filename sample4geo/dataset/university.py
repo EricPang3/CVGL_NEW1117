@@ -37,12 +37,21 @@ def scan(root, ids=None, altitude=None):
 
 def build_records(config, training=False):
     root = Path(config["data_root"])
+    development = config.get("eval_split", "test") == "development" and not training
+    partition = None
+    if (training and config.get("development_fraction", 0) > 0) or development:
+        from .development import development_partition
+        partition = development_partition(config)
+    selected = set(partition["development_ids" if development else "training_ids"]) if partition else None
     def identify(records):
         return [{**r, "key": Path(r["path"]).relative_to(root.resolve()).as_posix()} for r in records]
 
     if config["dataset"] == "U1652":
-        if training:
-            return identify(scan(root / "train/satellite")), identify(scan(root / "train/drone"))
+        if training or development:
+            sat, dro = scan(root / "train/satellite", selected), scan(root / "train/drone", selected)
+            if training:
+                return identify(sat), identify(dro)
+            return (identify(dro), identify(sat)) if config["direction"] == "D2S" else (identify(sat), identify(dro))
         base = root / "test"
         satellite, drone = ("query_satellite", "gallery_drone") if config["direction"] == "S2D" else ("gallery_satellite", "query_drone")
         sat, dro = scan(base / satellite), scan(base / drone)
@@ -52,8 +61,12 @@ def build_records(config, training=False):
         if len(train_ids) != 120 or not train_ids <= all_ids:
             raise ValueError("SUES200 划分必须包含 120 个合法且不重复的训练地点")
         test_ids = all_ids - train_ids
-        if training:
-            return identify(scan(root / "satellite-view", train_ids)), identify(scan(root / "drone_view_512", train_ids, config["altitude"]))
+        if training or development:
+            selected = selected if partition else train_ids
+            sat, dro = scan(root / "satellite-view", selected), scan(root / "drone_view_512", selected, config["altitude"])
+            if training:
+                return identify(sat), identify(dro)
+            return (identify(dro), identify(sat)) if config["direction"] == "D2S" else (identify(sat), identify(dro))
         sat_ids = test_ids if config["direction"] == "S2D" else all_ids
         dro_ids = test_ids if config["direction"] == "D2S" else all_ids
         sat = scan(root / "satellite-view", sat_ids)

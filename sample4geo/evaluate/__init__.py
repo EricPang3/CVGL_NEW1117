@@ -90,5 +90,9 @@ def evaluate(model, config, device):
                                  "missing_positive": "excluded_and_recorded",
                                  "ties": "stable_path_order", "inference_amp": bool(config["amp"] and device.type == "cuda")}})
     included = {r["path"] for r in gallery}
+    if config.get("eval_split", "test") == "development":
+        from ..dataset.development import development_partition
+        metrics["protocol"].update(split="development", development_partition_sha256=development_partition(config)["sha256"])
+    metrics["training_only_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith("training_head."))
     manifest = [{**r, "included": r["path"] in included} for r in raw_gallery]
     return metrics, {"gallery": manifest, "queries": results}

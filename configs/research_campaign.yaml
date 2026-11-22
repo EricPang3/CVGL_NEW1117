@@ -1,0 +1,47 @@
+run: research20261122
+batch_size: 24
+img_size: 384
+workers: 4
+eval_batch_size: 64
+module_alpha: 0.1
+screen_epochs: 2
+final_epochs: 3
+screen_seed: 1
+confirmation_seed: 2
+final_seeds: [1, 2, 3]
+development_fraction: 0.2
+development_seed: 20261122
+minimum_gain_ap_pp: 0.2
+maximum_dataset_r1_drop_pp: 1.0
+confirm_top_k: 3
+final_top_k: 2
+minimum_free_gib: 3.0
+screen_keep_top_k: 4
+report_limit: 200
+screen_tasks:
+  - {dataset: U1652, altitude: null}
+  - {dataset: SUES200, altitude: 150}
+final_tasks:
+  - {dataset: U1652, altitude: null}
+  - {dataset: SUES200, altitude: 150}
+  - {dataset: SUES200, altitude: 200}
+  - {dataset: SUES200, altitude: 250}
+  - {dataset: SUES200, altitude: 300}
+# 排序预先固定；所有候选从同一ImageNet预训练独立初始化。
+arms:
+  - {id: consensus, module: none, auxiliary: consensus, auxiliary_weight: 0.5, source: geocom}
+  - {id: prototype_pool, module: prototype_pool, source: sky_part}
+  - {id: prototype_graph, module: prototype_graph, source: sky_part}
+  - {id: prototype_dustbin, module: prototype_dustbin, source: gengeo}
+  - {id: visible_consensus, module: none, auxiliary: visible_consensus, auxiliary_weight: 0.5, source: mgs2}
+  - {id: part_align, module: none, auxiliary: part_align, auxiliary_weight: 0.1, source: sky_part}
+  - {id: scale_gate, module: scale_gate, source: dino_gfsa}
+  - {id: scale_uniform, module: scale_uniform, source: original_hypotheses, control_for: scale_gate}
+  - {id: frequency_gate, module: frequency_gate, source: original_hypotheses}
+  - {id: spatial_smooth, module: spatial_smooth, source: original_hypotheses, control_for: frequency_gate}
+  - {id: wt_proto_graph, module: wt_proto_graph, source: sky_part}
+  - {id: dw_proto_graph, module: dw_proto_graph, source: original_hypotheses, control_for: wt_proto_graph}
+  - {id: view_relation, module: none, auxiliary: view_relation, auxiliary_weight: 0.1, source: original_hypotheses}
+  - {id: vicreg, module: none, auxiliary: vicreg, auxiliary_weight: 0.01, source: original_hypotheses}
+  - {id: wt_consensus, module: wtconv, auxiliary: consensus, auxiliary_weight: 0.5, source: geocom}
+  - {id: ppm_consensus, module: ppm, auxiliary: consensus, auxiliary_weight: 0.5, source: geocom}

@@ -13,13 +13,18 @@ MODEL_NAME = "convnext_base.fb_in22k_ft_in1k_384"
 class TimmModel(nn.Module):
     """沿用原项目的 model.* 权重名；两路共享 ConvNeXt-B 和 GAP。"""
 
-    def __init__(self, pretrained=False, module="none", module_alpha=0.1, freeze_backbone=False):
+    def __init__(self, pretrained=False, module="none", module_alpha=0.1, freeze_backbone=False, auxiliary="none"):
         super().__init__()
         self.model = timm.create_model(
             MODEL_NAME, pretrained=pretrained, num_classes=0, global_pool="avg"
         )
         self.logit_scale = nn.Parameter(torch.tensor(math.log(1 / 0.07)))
         self.module_name, self.freeze_backbone = module, freeze_backbone
+        self.auxiliary_name = auxiliary
+        if auxiliary != "none":
+            from .auxiliary import TrainingObjective
+            with torch.random.fork_rng(devices=[]):
+                self.training_head = TrainingObjective(auxiliary, self.model.num_features)
         if module != "none":
             # 新模块初始化不消耗后续数据加载使用的全局 RNG，方便配对 seed 对照。
             with torch.random.fork_rng(devices=[]):
@@ -64,6 +69,14 @@ class TimmModel(nn.Module):
         features = self.encode(image)
         return features if other is None else (features, self.encode(other))
 
+    def training_loss(self, satellite, drone, criterion, weight):
+        # 同一对只提取一次特征图；此入口不会由独立评估调用。
+        sat_map, drone_map = self.model.forward_features(satellite), self.model.forward_features(drone)
+        sat, dro = self.encode_map(sat_map), self.encode_map(drone_map)
+        main = criterion(sat, dro, self.logit_scale.exp())
+        auxiliary = self.training_head(sat_map, drone_map, sat, dro, self.logit_scale.exp(), criterion)
+        return main + weight * auxiliary, main, auxiliary
+
     def data_config(self):
         return timm.data.resolve_model_data_config(self.model)
 
@@ -73,7 +86,7 @@ def load_model_state(model, state, initialize_module=False):
         model.load_state_dict(state, strict=True)
         return []
     missing, unexpected = model.load_state_dict(state, strict=False)
-    allowed = ("feature_module.", "parallel_projection.", "module_scale")
+    allowed = ("feature_module.", "parallel_projection.", "module_scale", "training_head.")
     if unexpected or any(not key.startswith(allowed) for key in missing):
         raise RuntimeError(f"权重结构不匹配：missing={missing}, unexpected={unexpected}")
     return missing

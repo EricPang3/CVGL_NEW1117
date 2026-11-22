@@ -1,4 +1,4 @@
-"""独立评估并导出逐图结果；不读取训练目录，不下载预训练权重。"""
+"""独立评估并导出逐图结果；默认test不读取训练目录，development需显式指定。"""
 
 import argparse
 import hashlib
@@ -21,6 +21,9 @@ def main():
     parser.add_argument("--altitude", type=int, choices=[150, 200, 250, 300])
     parser.add_argument("--data-root")
     parser.add_argument("--gallery-scope", choices=["all", "query_ids"])
+    parser.add_argument("--split", dest="eval_split", choices=["test", "development"], default="test")
+    parser.add_argument("--development-fraction", type=float, help="裸权重开发集评估需指定与训练一致的划分")
+    parser.add_argument("--development-seed", type=int)
     parser.add_argument("--module", help="默认恢复权重模块；裸基线权重仅允许额外启用无训练的 burst_gap")
     parser.add_argument("--module-alpha", type=float)
     parser.add_argument("--device")
@@ -32,6 +35,10 @@ def main():
     checkpoint = Path(args.checkpoint).expanduser().resolve()
     state, saved = load_weights(checkpoint)
     config = experiment_config(args, saved)
+    # --dataset/--config可以切换数据路径，模型结构必须从权重恢复。
+    for key in ("module", "module_alpha"):
+        if getattr(args, key) is None and key in saved:
+            config[key] = saved[key]
     for key in ("mean", "std", "img_size"):
         if key in saved:
             config[key] = saved[key]
@@ -48,6 +55,9 @@ def main():
     if args.module and args.module != saved.get("module", "none") and args.module != "burst_gap":
         parser.error("只能对已有基线额外启用无训练的 burst_gap；其他模块必须加载已训练权重")
     options = {} if config["module"] == "none" else dict(module=config["module"], module_alpha=config["module_alpha"])
+    if saved.get("auxiliary", "none") != "none":
+        options["auxiliary"] = saved["auxiliary"]
+    config["auxiliary"] = saved.get("auxiliary", "none")
     model = TimmModel(pretrained=False, **options)
     load_model_state(model, state, initialize_module=config["module"] == "burst_gap" and saved.get("module", "none") == "none")
     config.update(module_alpha_metadata(model, args.module_alpha))
@@ -64,6 +74,14 @@ def main():
     config.update({"model": MODEL_NAME, "checkpoint": str(checkpoint),
                    "checkpoint_sha256": file_hash(checkpoint), "checkpoint_metadata": bool(saved),
                    "evaluated_at": datetime.now().astimezone().isoformat()})
+    if config["eval_split"] == "development":
+        from sample4geo.dataset.development import development_partition
+        partition = development_partition(config)
+        if saved.get("development_partition") and partition != saved["development_partition"]:
+            parser.error("评估开发划分与权重训练时划分不一致")
+        if set(saved.get("training_ids", [])) & set(partition["development_ids"]):
+            parser.error("开发查询地点已参与该权重训练，拒绝泄漏评估")
+        config["development_partition"] = partition
     evaluation_code = snapshot_source(output, "evaluation_source.zip")
     config.update(evaluation_source_sha256=evaluation_code["source_sha256"], evaluation_git_commit=evaluation_code["git_commit"])
     metrics, queries = evaluate(model, config, device)

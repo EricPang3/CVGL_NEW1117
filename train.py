@@ -33,6 +33,11 @@ def main():
     parser.add_argument("--augmentation", choices=["s4g", "camp"])
     parser.add_argument("--module", help="none 或模块实验 ID")
     parser.add_argument("--module-alpha", type=float)
+    parser.add_argument("--auxiliary", help="none/consensus/visible_consensus/part_align/view_relation/vicreg")
+    parser.add_argument("--auxiliary-weight", type=float)
+    parser.add_argument("--development-fraction", type=float, help="显式从训练地点留出开发集；默认0")
+    parser.add_argument("--development-seed", type=int)
+    parser.add_argument("--gradient-checkpointing", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--freeze-backbone", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--device")
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None)
@@ -42,10 +47,14 @@ def main():
     device = setup(config)
     satellite, drone = build_records(config, training=True)
     options = {} if config["module"] == "none" and not config["freeze_backbone"] else dict(module=config["module"], module_alpha=config["module_alpha"], freeze_backbone=config["freeze_backbone"])
+    if config["auxiliary"] != "none":
+        options["auxiliary"] = config["auxiliary"]
     model = TimmModel(pretrained=config["pretrained"] and not args.init_checkpoint, **options)
+    if config["gradient_checkpointing"]:
+        model.model.set_grad_checkpointing(True)
     if args.init_checkpoint:
         state, _ = load_weights(args.init_checkpoint)
-        load_model_state(model, state, initialize_module=config["module"] != "none")
+        load_model_state(model, state, initialize_module=config["module"] != "none" or config["auxiliary"] != "none")
         del state
     config.update(module_alpha_metadata(model, args.module_alpha))
     data = model.data_config()
@@ -72,6 +81,12 @@ def main():
     config["trainable_parameters"] = sum(p.numel() for p in model.parameters() if p.requires_grad)
     config["extra_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
     config["extra_trainable_parameters"] = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
+    config["training_only_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith("training_head."))
+    if config["development_fraction"]:
+        from sample4geo.dataset.development import development_partition
+        config["development_partition"] = development_partition(config)
+        if set(config["training_ids"]) != set(config["development_partition"]["training_ids"]):
+            raise RuntimeError("训练数据与预注册开发划分不一致")
     if config["dataset"] == "SUES200":
         config["split_sha256"] = hashlib.sha256((ROOT / "configs/sues200_split.yaml").read_bytes()).hexdigest()
     dataset = U1652DatasetTrain(satellite, drone, get_transforms(config, training=True))
@@ -86,6 +101,8 @@ def main():
     print(f"训练输出：{output}")
     fields = ["epoch", "loss", "lr", "first_lr", "seconds", "pairs", "steps", "optimizer_updates",
               "amp_skipped_steps", "amp_scale", "dropped_pairs", "logit_scale", "peak_gpu_mb", "module_alpha"]
+    if config["auxiliary"] != "none":
+        fields.extend(["main_loss", "auxiliary_loss", "auxiliary_weight"])
     with (output / "train.csv").open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()

@@ -1,0 +1,32 @@
+checked_at: '2026-11-22'
+implementation: '本轮代码为论文思想适配；不标为作者完整复现，不复制未公开代码。'
+sources:
+  sky_part:
+    paper: https://arxiv.org/html/2605.11654v3
+    code: https://github.com/chisngyen/SkyPart
+    idea: '共享语义原型发现部件、部件关系聚合。'
+    adaptation: 'ConvNeXt末级图，8部件/128维/一层注意力；保留GAP旁路。无DINO教师、FiLM、多级蒸馏或原文动态active-set。'
+  geocom:
+    paper: https://arxiv.org/html/2608.09321
+    code: https://github.com/chord-sz/GeoCoM
+    code_status: '检查时仅README与LICENSE，尚无完整实现。'
+    idea: '仅训练期使用双视角共识锚点，让单视角描述子学习共同信息。'
+    adaptation: '两路末级特征用共享部件汇聚为联合锚点，增加两项InfoNCE；未实现原文截断骨干/64 probes/联合编码器。'
+  gengeo:
+    paper: https://www.mdpi.com/2072-4292/18/8/1116
+    idea: '共享分配空间中的dustbin过滤不可匹配区域。'
+    adaptation: '额外原型作为dustbin的softmax近似；不是SALAD的最优传输，也不是原文DINOv2方案。原文任务为CVUSA/CVACT/VIGOR。'
+  dino_gfsa:
+    code: https://github.com/Bear611/DINO-GFSA
+    paper: https://arxiv.org/abs/2606.00784
+    idea: '语义门控选择有用空间细节。'
+    adaptation: '在同一末级图选择三种膨胀卷积感受野；不是原文跨层DINOv3/LoRA/Mamba实现。'
+  mgs2:
+    paper: https://arxiv.org/pdf/2602.10704v2
+    code: https://github.com/GabrielLi1473/MGS-Net
+    code_status: '检查时链接仓库没有可复现代码。'
+    idea: '共同可见性与几何先验指导局部对应。'
+    adaptation: 'visible_consensus仅使用语义相似度与部件质量作为置信代理；没有深度模型，不能解释成真实几何可见性。'
+  original_hypotheses:
+    idea: 'frequency_gate、view_relation、vicreg及组合为自写假设/通用控制，不冒充新的论文模块。'
+    adaptation: '频域先非线性后GAP；空间平滑、均匀尺度、普通深度卷积为对应机制对照。'

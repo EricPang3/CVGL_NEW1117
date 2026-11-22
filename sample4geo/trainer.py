@@ -23,6 +23,7 @@ def cosine_scheduler(optimizer, batches_per_epoch, config):
 def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, epoch, device):
     model.train()
     total, count = 0.0, 0
+    main_total, auxiliary_total = 0.0, 0.0
     started = time.monotonic()
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
@@ -33,8 +34,13 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
         optimizer.zero_grad(set_to_none=True)
         context = torch.autocast("cuda", dtype=torch.float16) if scaler.is_enabled() else nullcontext()
         with context:
-            sat_features, drone_features = model(satellite, drone)
-            loss = criterion(sat_features, drone_features, model.logit_scale.exp())
+            if config.get("auxiliary", "none") != "none":
+                loss, main_loss, auxiliary_loss = model.training_loss(satellite, drone, criterion, config["auxiliary_weight"])
+                main_total += main_loss.detach().item() * len(satellite)
+                auxiliary_total += auxiliary_loss.detach().item() * len(satellite)
+            else:
+                sat_features, drone_features = model(satellite, drone)
+                loss = criterion(sat_features, drone_features, model.logit_scale.exp())
         if not torch.isfinite(loss):
             raise RuntimeError(f"Epoch {epoch} 出现非有限 loss")
         scaler.scale(loss).backward()
@@ -49,7 +55,7 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
         scheduler.step()
         total += loss.item() * len(satellite)
         count += len(satellite)
-    return {"epoch": epoch, "loss": total / count, "lr": last_lr, "first_lr": first_lr,
+    result = {"epoch": epoch, "loss": total / count, "lr": last_lr, "first_lr": first_lr,
             "seconds": time.monotonic() - started, "pairs": count, "steps": len(loader),
             "optimizer_updates": len(loader) - skipped, "amp_skipped_steps": skipped,
             "amp_scale": scaler.get_scale(),
@@ -57,3 +63,6 @@ def train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, 
             "module_alpha": model.module_scale.detach().item() if hasattr(model, "module_scale") else None,
             "dropped_pairs": loader.batch_sampler.dropped,
             "logit_scale": model.logit_scale.detach().exp().item()}
+    if config.get("auxiliary", "none") != "none":
+        result.update(main_loss=main_total / count, auxiliary_loss=auxiliary_total / count, auxiliary_weight=config["auxiliary_weight"])
+    return result

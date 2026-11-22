@@ -1,5 +1,7 @@
 # CVGL_NEW：AI 维护契约
 
+> 2026-11-22最新任务：继续自动模块筛查并对标近期强方法，用户偏好先涨点、后分析。续接先读AGENTS.md与RESEARCH_STATE.md。新服务器43322已连接，数据/4090可用；长队列24/48小时预算待用户选择。原baseline契约只约束显式none路径，新候选允许训练期辅助分支与已记录的头部适配；新队列configs/research_campaign.yaml，思想来源configs/research_sources.yaml。
+
 > 2026-11-20：用户授权33模块完整矩阵。先读不可修改的《核心思想（AI必读）.md》、模块目录和EXPERIMENT_LOG.md。以下baseline契约适用于module=none；显式模块实验允许目录中的共享适配头，不能删除原GAP旁路。队列配置configs/module_suite.yaml，脚本scripts/module_suite.py，本地接收scripts/collect_experiments.py。真实完成状态看outputs/modules20261120/state.json，不要把已排队写成已完成。
 
 ## 目标与用户约定
@@ -34,7 +36,7 @@
 - 默认打包全部缩略图，ZIP含index.html、images、完整queries、指标、配置、训练CSV、源码快照；不含权重/原始分辨率图片。限量报告不能离线展示未打包的图片。
 - 本地重建优先复用下载缩略图。比较前核对任务、预处理、查询、有效图库和协议；只允许训练配方不同。输出修好/退步和comparison.json，不能把图库变化当改进。
 - 人工标注浏览器保存并导出JSON；file://的localStorage不保证可用，导出是正式保存方式。HTML用textContent插入内容，嵌入JSON必须转义<、>、&。
-- 案例用于提出假设，不能自动证明原因。建议在训练地点内建验证集选方案；当前未自动划验证集。
+- 案例用于提出假设，不能自动证明原因。新研究队列在训练地点内显式留20%开发集；正式矩阵回到完整原训练地点。开发划分ID/hash进入配置，不能用旧的全训练权重当无泄漏开发集模型。
 
 ## 运行边界
 

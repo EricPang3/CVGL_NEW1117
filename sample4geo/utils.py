@@ -62,7 +62,8 @@ def snapshot_source(output, filename="source.zip"):
 
 def configure(config, args):
     for key in ("direction", "altitude", "data_root", "device", "workers", "img_size",
-                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation", "module", "module_alpha", "freeze_backbone"):
+                "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation", "module", "module_alpha", "freeze_backbone",
+                "auxiliary", "auxiliary_weight", "development_fraction", "development_seed", "eval_split", "gradient_checkpointing"):
         value = getattr(args, key, None)
         if value is not None:
             config[key] = value
@@ -86,6 +87,19 @@ def configure(config, args):
     config.setdefault("module", "none")
     config.setdefault("module_alpha", 1.0 if config["module"] == "burst_gap" else 0.1)
     config.setdefault("freeze_backbone", False)
+    config.setdefault("auxiliary", "none")
+    config.setdefault("auxiliary_weight", 0.5)
+    config.setdefault("development_fraction", 0.0)
+    config.setdefault("development_seed", 20261122)
+    config.setdefault("eval_split", "test")
+    config.setdefault("gradient_checkpointing", False)
+    from .auxiliary import AUXILIARIES
+    if config["auxiliary"] not in AUXILIARIES or not np.isfinite(config["auxiliary_weight"]) or config["auxiliary_weight"] < 0:
+        raise ValueError("辅助目标或权重不合法")
+    if not 0 <= config["development_fraction"] < 1 or config["eval_split"] not in ("test", "development"):
+        raise ValueError("开发划分比例或评估split不合法")
+    if config["eval_split"] == "development" and config["development_fraction"] <= 0:
+        raise ValueError("development评估需要非零开发集比例")
     if config["augmentation"] not in ("s4g", "camp") or config["amp_init_scale"] <= 0:
         raise ValueError("augmentation 必须为 s4g/camp，amp_init_scale 必须大于 0")
     for key in ("img_size", "batch_size", "eval_batch_size", "epochs", "top_k"):
