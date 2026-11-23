@@ -1,14 +1,13 @@
 """独立评估并导出逐图结果；默认test不读取训练目录，development需显式指定。"""
 
 import argparse
-import hashlib
 import shutil
 from datetime import datetime
 from pathlib import Path
 
 from sample4geo.evaluate import evaluate
 from sample4geo.model import MODEL_NAME, TimmModel, load_model_state, module_alpha_metadata
-from sample4geo.utils import configure, experiment_config, load_weights, save_config, save_json, setup, snapshot_source
+from sample4geo.utils import configure, experiment_config, file_hash, load_weights, save_config, save_json, setup, snapshot_source
 
 
 def main():
@@ -35,6 +34,8 @@ def main():
     checkpoint = Path(args.checkpoint).expanduser().resolve()
     state, saved = load_weights(checkpoint)
     config = experiment_config(args, saved)
+    config["checkpoint_epoch"] = saved.get("checkpoint_epoch")
+    config["checkpoint_planned_epochs"] = saved.get("epochs")
     # --dataset/--config可以切换数据路径，模型结构必须从权重恢复。
     for key in ("module", "module_alpha", "development_fraction", "development_seed"):
         if getattr(args, key) is None and key in saved:
@@ -103,15 +104,6 @@ def main():
         save_config(config, output / "config.yaml")
     print(" - ".join(f"{key}: {metrics[key] * 100:.2f}%" for key in ("recall@1", "recall@5", "recall@10", "recall@1%", "mAP")))
     print(f"评估结果：{output}")
-
-
-def file_hash(path):
-    path = Path(path)
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # CVGL_NEW：AI 维护契约
 
+> 2026-11-23最新授权：用户要求修改并继续实验。新分支experiments/20261123-e1-ablation，固定七组、恢复原1epoch配方，并用真实第1轮快照诊断3epoch调度退化。配方configs/ablation_1epoch.yaml，设计/命令见README_ABLATION.md。53项CPU检查及4种幅值1/32特征图检查通过；GPU尚未启动（43322拒绝连接，等待用户开机/新SSH），不能写成正在跑或已有新分数。新队列拟从实际启动起24小时，旧87组完整结果不变。普通卷积与WT可训练参数精确匹配，总参数/计算量不同。
+
 > 2026-11-23完整复盘：research20261122已于北京时间00:04:05完成87/87组、246项评估，3seed正式矩阵45/45完成，87包已本地归档。全部714条当前有效指标、321个结果包及第二轮15份权重核验通过。总表与完整明细在results/review20261123/summary.md和all_results.csv。共识在部分任务有同配方配对增益，但3epoch配方弱于旧1epoch，尚未达到统一超越基线/强方法目标。以下启动信息为历史记录；当前不应重启旧队列。
 
 > 2026-11-22最新任务：用户再次要求继续，research20261122已于北京时间12:20:47启动，采用推荐24小时上限，次日12:20:47后不启动新任务，当前任务归档后关机。新服务器43322，本地接收已启动。续接先读AGENTS.md与RESEARCH_STATE.md，实时状态看outputs/research20261122/state.json。原baseline契约只约束显式none路径；候选配置configs/research_campaign.yaml，来源configs/research_sources.yaml。不要再将“预算待确认”当作阻塞。

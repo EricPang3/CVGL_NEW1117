@@ -15,7 +15,6 @@ from sample4geo.auxiliary import AUXILIARIES, TrainingObjective
 from sample4geo.loss import InfoNCE
 from sample4geo.model import TimmModel
 from sample4geo.modules import make_module
-from sample4geo.research_modules import FEATURE_MODULES
 from sample4geo.utils import read_config, save_json
 
 
@@ -38,7 +37,9 @@ def main():
     torch.set_num_threads(2)
     batch = config["batch_size"] if device.type == "cuda" else 2
     checks = {}
-    for name in [*FEATURE_MODULES, *["aux:" + a for a in AUXILIARIES[1:]]]:
+    names = sorted({a["module"] for a in config["arms"] if a["module"] != "none"})
+    names += sorted({"aux:" + a["auxiliary"] for a in config["arms"] if a.get("auxiliary", "none") != "none"})
+    for name in names:
         module = None
         try:
             module = (TrainingObjective(name[4:], 1024) if name.startswith("aux:") else make_module(name)[0]).to(device)

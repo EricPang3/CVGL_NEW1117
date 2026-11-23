@@ -22,6 +22,7 @@ def write_csv(path, rows):
 def export_research(state, run, root=ROOT):
     directory = Path(root) / "results" / run
     write_csv(directory / "metrics.csv", state.get("results", []))
+    write_csv(directory / "diagnostics.csv", state.get("diagnostic_summary", []))
     selection = []
     for phase, key in (("screen", "screen_selection"), ("confirmation", "confirmation_selection")):
         for row in state.get(key, []):
@@ -47,6 +48,48 @@ def export_research(state, run, root=ROOT):
             "mean_paired_delta_R1_pp": statistics.mean(r["delta_R1_pp"] for r in rows),
             "mean_paired_delta_AP_pp": statistics.mean(r["delta_AP_pp"] for r in rows)})
     write_csv(directory / "paired_seeds.csv", paired)
+    if state.get("selection_mode") == "fixed_ablation":
+        export_ablation(state, directory)
+
+
+def export_ablation(state, directory):
+    contrasts = [("wtconv", "baseline"), ("dwconv_matched", "baseline"), ("consensus", "baseline"),
+                 ("visible_consensus", "consensus"), ("wt_consensus", "consensus"),
+                 ("dw_consensus", "consensus"), ("wt_consensus", "dw_consensus"),
+                 ("wt_consensus", "wtconv"), ("dw_consensus", "dwconv_matched")]
+    keys = ("seed", "dataset", "altitude", "gallery_scope", "direction")
+    lookup = {(r["variant"], *[r[k] for k in keys]): r for r in state.get("results", [])
+              if r["phase"] == "final" and r["split"] == "test" and
+              state.get("jobs", {}).get(r["artifact_job"], {}).get("status") == "complete"}
+    effects = []
+    for candidate, control in contrasts:
+        for key, row in lookup.items():
+            if key[0] != candidate:
+                continue
+            base = lookup.get((control, *key[1:]))
+            if base is None:
+                continue
+            if any(row.get(k) != base.get(k) for k in ("epochs", "batch_size", "img_size", "schedule_epochs")):
+                raise ValueError("消融配方不一致，不能计算配对差值")
+            effects.append({"candidate": candidate, "control": control, **{k: row[k] for k in keys},
+                "delta_R1_pp": row["recall@1"] - base["recall@1"], "delta_AP_pp": row["mAP"] - base["mAP"],
+                "candidate_sha256": row["checkpoint_sha256"], "control_sha256": base["checkpoint_sha256"]})
+    write_csv(directory / "ablation_effects.csv", effects)
+    groups = {}
+    for row in effects:
+        key = tuple(row[k] for k in ("candidate", "control", *keys[1:]))
+        groups.setdefault(key, []).append(row)
+    summary = []
+    for key, rows in sorted(groups.items(), key=lambda item: str(item[0])):
+        summary.append({**dict(zip(("candidate", "control", *keys[1:]), key)), "n": len(rows),
+            "seeds": ",".join(str(r["seed"]) for r in sorted(rows, key=lambda r: r["seed"])),
+            "complete": {r["seed"] for r in rows} == set(state["final_seeds"]),
+            "mean_delta_R1_pp": statistics.mean(r["delta_R1_pp"] for r in rows),
+            "std_delta_R1_pp": statistics.stdev(r["delta_R1_pp"] for r in rows) if len(rows) > 1 else None,
+            "mean_delta_AP_pp": statistics.mean(r["delta_AP_pp"] for r in rows),
+            "positive_R1_seeds": sum(r["delta_R1_pp"] > 0 for r in rows),
+            "negative_R1_seeds": sum(r["delta_R1_pp"] < 0 for r in rows)})
+    write_csv(directory / "ablation_summary.csv", summary)
 
 
 def main():

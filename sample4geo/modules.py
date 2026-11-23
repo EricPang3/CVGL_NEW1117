@@ -31,6 +31,10 @@ class DepthwiseResidual(nn.Module):
 
 
 def make_module(name, channels=1024):
+    if name == "dwconv_matched":
+        gain = nn.Conv2d(channels, channels, 1, groups=channels, bias=False)
+        nn.init.ones_(gain.weight)
+        return nn.Sequential(*[nn.Conv2d(channels, channels, 3, padding=1, groups=channels) for _ in range(5)], nn.GELU(), gain), "residual", channels
     from .research_modules import FEATURE_MODULES, research_module
     if name in FEATURE_MODULES:
         return research_module(name, channels)

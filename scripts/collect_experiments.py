@@ -37,7 +37,7 @@ launcher=p.parent/(name+'.launch.log')
 if launcher.exists():paths.append((launcher,'suite_launcher.log',terminal))
 for f,label,complete in paths:
  info=f.stat();logs.append({'path':str(f),'name':label,'size':info.st_size,'mtime':info.st_mtime_ns,'sha256':hashlib.sha256(f.read_bytes()).hexdigest() if complete else None})
-summary=[n for n in ('commands.jsonl','metrics.csv','protocol.yaml','gpu_preflight.json','weight_cleanup.jsonl','source.zip','shutdown.json') if (p/n).is_file()]
+summary=[n for n in ('commands.jsonl','metrics.csv','diagnostics.csv','protocol.yaml','gpu_preflight.json','weight_cleanup.jsonl','source.zip','shutdown.json') if (p/n).is_file()]
 print(json.dumps({'state':state,'ready':ready,'logs':logs,'summary_files':summary}))
 '''
 
@@ -131,7 +131,12 @@ def dashboard(directory, remote, manifest):
     count = f'{len(results)}（开发/复验/测试分别列出）' if research else f'{len(results)}/370'
     page = f'<!doctype html><meta charset="utf-8"><title>{heading}</title><style>body{{font-family:system-ui;padding:24px;color:#243543}}table{{border-collapse:collapse}}td,th{{padding:8px;border-bottom:1px solid #ddd;text-align:left}}input{{padding:10px;width:350px}}a{{color:#176b75}}</style>'
     page += f'<h1>{heading}</h1><p>运行：{html.escape(directory.name)}；状态：{status}；当前：{active}</p><p>真实评估 {count}；本地已归档 {len(manifest["artifacts"])}/{remote.get("expected_archive_tasks", 190)} 个已完成任务。点击有链接的模块看案例；分数为百分比，差值为百分点。</p>'
-    page += ('<p>仅开发集决定晋级；官方测试按预注册矩阵执行。有提升的开发项与最终矩阵生成案例；其余完整逐图结果在queries.json。落选权重由服务器验证归档后清理；最终seed1权重额外下载到本地，保留SHA。不同图库、阶段不混比。</p>' if research else '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重按configs/checkpoint_retention.json保留；discarded_by_policy表示只保留结果，shared_baseline表示共用baseline权重。基线训练、模块训练和重排拟合预算不同，比较时同时查看配置、参数与耗时。</p>')
+    if research:
+        policy = ('固定消融：全部预注册候选与对照均运行，开发集退步不删组；学习率诊断只读开发集。'
+                  if remote.get("selection_mode") == "fixed_ablation" else '仅开发集决定晋级；官方测试按预注册矩阵执行。')
+        page += '<p>' + policy + '有提升的开发项与全部正式矩阵生成案例；其余完整逐图结果在queries.json。权重按protocol.yaml保留，其余完整归档后清理；不同图库、阶段分列。diagnostics.csv是训练轨迹对照，ablation_summary.csv是同seed的模块对照。</p>'
+    else:
+        page += '<p>每页默认展示最差200例，全部逐图结果在对应queries.json。权重按configs/checkpoint_retention.json保留；discarded_by_policy表示只保留结果，shared_baseline表示共用baseline权重。比较时同时查看配置、参数与耗时。</p>'
     page += '<input placeholder="筛选模块、数据集或方向" oninput="for(const r of document.querySelectorAll(\'tbody tr\'))r.hidden=!r.textContent.toLowerCase().includes(this.value.toLowerCase())">'
     page += '<table><thead><tr>'+''.join('<th>'+k+'</th>' for k in ('模块','类型','数据集','高度','方向','R@1','AP','ΔR@1','ΔAP','修好','退步','额外参数','权重状态'))+'</tr></thead><tbody>'+''.join(rows)+'</tbody></table>'
     page += '<p>状态与命令：state.json、commands.jsonl；归档清单：archive_manifest.json。单seed差异不能证明稳定增益；人工查看案例用于形成假设。</p>'

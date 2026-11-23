@@ -94,5 +94,7 @@ def evaluate(model, config, device):
         from ..dataset.development import development_partition
         metrics["protocol"].update(split="development", development_partition_sha256=development_partition(config)["sha256"])
     metrics["training_only_parameters"] = sum(p.numel() for n, p in model.named_parameters() if n.startswith("training_head."))
+    metrics["extra_trainable_parameters"] = sum(p.numel() for n, p in model.named_parameters() if p.requires_grad and n.startswith(("feature_module.", "parallel_projection.", "module_scale")))
+    metrics["checkpoint_epoch"] = config.get("checkpoint_epoch")
     manifest = [{**r, "included": r["path"] in included} for r in raw_gallery]
     return metrics, {"gallery": manifest, "queries": results}

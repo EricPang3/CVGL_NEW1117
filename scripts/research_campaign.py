@@ -124,10 +124,14 @@ class Campaign:
             self.state.pop("preflight_passed", None)
         self.baseline = {"id": "baseline", "module": "none", "auxiliary": "none"}
         self.arms = {a["id"]: a for a in self.config["arms"]}
+        self.selection_mode = self.config.get("selection_mode", "development")
+        if self.selection_mode not in ("development", "fixed_ablation"):
+            raise ValueError("selection_mode必须为development或fixed_ablation")
         self.environment = {**os.environ, "CVGL_DATA_ROOT": str(Path(data_root).expanduser().resolve()),
                             "HF_HUB_OFFLINE": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"}
         self.state.update(status="running", active=None)
         self.state["final_seeds"] = self.config.get("final_seeds", [1])
+        self.state["selection_mode"] = self.selection_mode
         if retry_failed:
             for record in self.state["jobs"].values():
                 if record.get("status") == "failed":
@@ -146,6 +150,9 @@ class Campaign:
                 writer = csv.DictWriter(stream, fieldnames=list(self.state["results"][0]), lineterminator="\n")
                 writer.writeheader()
                 writer.writerows(self.state["results"])
+        if self.state.get("diagnostic_summary"):
+            from scripts.research_records import write_csv
+            write_csv(self.directory / "diagnostics.csv", self.state["diagnostic_summary"])
 
     def boundary(self):
         if datetime.now(timezone.utc) >= datetime.fromisoformat(self.state["deadline"]):
@@ -202,9 +209,18 @@ class Campaign:
         ready = {"job": job, "bundle": str(bundle), "bundle_sha256": digest(bundle),
                  "checkpoint": str(model_dir / "model.pth"), "model_dir": str(model_dir),
                  "checkpoint_sha256": record["checkpoint_sha256"], "archive_checkpoint": False, "retain_remote": True,
-                 "checkpoint_storage": "retained_on_server" if (model_dir / "model.pth").is_file() else "discarded_on_server_after_records",
+                 "checkpoint_storage": ("retained_on_server" if self.retain_final_weight(record) else "pending_server_cleanup") if (model_dir / "model.pth").is_file() else "discarded_on_server_after_records",
                  "phase": record["phase"], "seed": record["seed"], "variant": record["variant"]}
         atomic_json(self.directory / "archive_ready" / f"{job}.json", ready)
+
+    def retain_final_weight(self, record):
+        if record["variant"] == "baseline" or record["phase"] != "final":
+            return True
+        if record["seed"] != self.config["final_seeds"][0]:
+            return False
+        variants = self.config.get("retain_final_candidates")
+        tasks = self.config.get("retain_final_candidate_tasks")
+        return (variants is None or record["variant"] in variants) and (tasks is None or label(record) in tasks)
 
     def compact(self, job):
         """仅释放已校验归档的重复副本；baseline原始queries留给后续同任务比较。"""
@@ -257,7 +273,7 @@ class Campaign:
             stream.write(json.dumps(deletion, ensure_ascii=False) + "\n")
         self.archive(job)
 
-    def train_and_evaluate(self, phase, seed, arm, task):
+    def train_and_evaluate(self, phase, seed, arm, task, baseline_phase=None):
         job = job_name(phase, seed, arm, task)
         existing = self.state["jobs"].get(job, {})
         if existing.get("status") in ("complete", "failed"):
@@ -269,13 +285,14 @@ class Campaign:
             "variant": arm["id"], "module": arm["module"], **task, "model_dir": str(model_dir)})
         development = phase != "final"
         split = "development" if development else "test"
+        imported = bool(arm.get("evaluation_only"))
         try:
-            if "train" not in record["completed"] and model_dir.exists():
+            if not imported and "train" not in record["completed"] and model_dir.exists():
                 interrupted = model_dir.with_name(model_dir.name + f"_interrupted_{time.time_ns()}")
                 model_dir.rename(interrupted)
                 self.state["events"].append({"at": now(), "job": job, "type": "interrupted_training_restart", "preserved": str(interrupted)})
             train_args = ["train.py", "--dataset", task["dataset"], "--name", output_name, "--seed", seed,
-                "--epochs", self.config["screen_epochs"] if development else self.config["final_epochs"],
+                "--epochs", arm.get("epochs", self.config["screen_epochs"] if development else self.config["final_epochs"]),
                 "--batch-size", self.config["batch_size"], "--img-size", self.config["img_size"], "--workers", self.config["workers"],
                 "--module", arm["module"], "--module-alpha", self.config["module_alpha"],
                 "--auxiliary", arm.get("auxiliary", "none"), "--auxiliary-weight", arm.get("auxiliary_weight", 0.5),
@@ -283,7 +300,15 @@ class Campaign:
                 "--development-seed", self.config["development_seed"]]
             if task["altitude"] is not None:
                 train_args += ["--altitude", task["altitude"]]
-            self.command(job, "train", train_args)
+            if arm.get("schedule_epochs") is not None:
+                train_args += ["--schedule-epochs", arm["schedule_epochs"]]
+            if arm.get("checkpoint_epochs"):
+                train_args += ["--checkpoint-epochs", *arm["checkpoint_epochs"]]
+            if imported:
+                if "checkpoint_import" not in record["completed"]:
+                    raise RuntimeError("诊断权重未完成来源核验，拒绝跳过训练")
+            else:
+                self.command(job, "train", train_args)
             checkpoint = model_dir / "model.pth"
             record["checkpoint_sha256"] = digest(checkpoint)
             scopes = ["query_ids"] if development or task["dataset"] == "U1652" else ["query_ids", "all"]
@@ -293,7 +318,7 @@ class Campaign:
                     self.command(job, f"eval_{scope}_{direction}", ["evaluate.py", "--checkpoint", checkpoint, "--output", output,
                         "--direction", direction, "--split", split, "--gallery-scope", scope, "--batch-size", self.config["eval_batch_size"], "--overwrite"])
                     metrics = json.loads((output / "metrics.json").read_text())
-                    base_job = job_name(phase, seed, self.baseline, task)
+                    base_job = job_name(baseline_phase or phase, seed, self.baseline, task)
                     base_path = Path(self.state["jobs"][base_job]["model_dir"])
                     base_path = base_path / direction if scope == "query_ids" else base_path / "all" / direction
                     base = json.loads((base_path / "metrics.json").read_text())
@@ -304,19 +329,24 @@ class Campaign:
                     delta_r1 = (metrics["recall@1"] - base["recall@1"]) * 100
                     delta_ap = (metrics["mAP"] - base["mAP"]) * 100
                     row = {"artifact_job": job, "phase": phase, "seed": seed, "variant": arm["id"], "module": arm["module"],
-                        "auxiliary": arm.get("auxiliary", "none"), "kind": "baseline" if arm["id"] == "baseline" else "research",
+                        "auxiliary": arm.get("auxiliary", "none"), "kind": "baseline" if arm["id"] == "baseline" else "checkpoint_diagnostic" if imported else "schedule_diagnostic" if phase.startswith("diagnostic") else arm.get("role", "research"),
                         **task, "split": split, "gallery_scope": scope, "direction": direction,
                         "recall@1": metrics["recall@1"] * 100, "mAP": metrics["mAP"] * 100,
                         "delta_R1_pp": delta_r1, "delta_AP_pp": delta_ap, "fixed_queries": comparison["counts"]["fixed"],
                         "regressed_queries": comparison["counts"]["regressed"], "extra_parameters": metrics["extra_parameters"],
-                        "training_only_parameters": metrics.get("training_only_parameters", 0), "checkpoint_sha256": record["checkpoint_sha256"]}
+                        "training_only_parameters": metrics.get("training_only_parameters", 0), "checkpoint_sha256": record["checkpoint_sha256"],
+                        "extra_trainable_parameters": metrics.get("extra_trainable_parameters"), "baseline_phase": baseline_phase or phase}
                     with (model_dir / "train.csv").open(newline="") as stream:
                         history = list(csv.DictReader(stream))
+                    training_config = yaml.safe_load((model_dir / "config.yaml").read_text())
                     row.update(epochs=len(history), batch_size=self.config["batch_size"], img_size=self.config["img_size"],
                         train_seconds=sum(float(r["seconds"]) for r in history),
                         amp_skipped_steps=sum(int(r["amp_skipped_steps"]) for r in history),
                         peak_training_gpu_mb=max(float(r["peak_gpu_mb"]) for r in history),
-                        development_partition_sha256=metrics["protocol"].get("development_partition_sha256"))
+                        development_partition_sha256=metrics["protocol"].get("development_partition_sha256"),
+                        checkpoint_epoch=int(history[-1]["epoch"]), training_reused=imported, source_job=record.get("source_job"),
+                        schedule_epochs=training_config.get("schedule_epochs", training_config.get("epochs")),
+                        additional_training_seconds=0.0 if imported else sum(float(r["seconds"]) for r in history))
                     rows = self.state["results"]
                     rows[:] = [r for r in rows if (r["artifact_job"], r["gallery_scope"], r["direction"]) != (job, scope, direction)]
                     rows.append(row)
@@ -330,7 +360,7 @@ class Campaign:
             record.update(status="complete", finished_at=now())
             self.archive(job)
             self.save()
-            if not development and seed != self.config["final_seeds"][0]:
+            if not self.retain_final_weight(record):
                 self.prune(job)
             self.compact(job)
             return True
@@ -344,6 +374,93 @@ class Campaign:
         complete = [r for r in self.state["results"] if self.state["jobs"].get(r["artifact_job"], {}).get("status") == "complete"]
         return assess(complete, arms, phases, self.config["screen_tasks"],
                       self.config["minimum_gain_ap_pp"], self.config["maximum_dataset_r1_drop_pp"])
+
+    def import_diagnostic_checkpoint(self, source_job, epoch, seed, task):
+        arm = {"id": "schedule3_prefix", "module": "none", "evaluation_only": True}
+        job = job_name("diagnostic1", seed, arm, task)
+        existing = self.state["jobs"].get(job, {})
+        if existing.get("status") == "complete" or "checkpoint_import" in existing.get("completed", []):
+            return arm, job
+        self.boundary()
+        source = Path(self.state["jobs"][source_job]["model_dir"])
+        manifest = json.loads((source / "checkpoint_epochs.json").read_text())[str(epoch)]
+        weight = (source / manifest["file"]).resolve()
+        if weight.parent != source.resolve() or manifest["epoch"] != epoch or digest(weight) != manifest["sha256"]:
+            raise RuntimeError("中间checkpoint来源/epoch/指纹不匹配")
+        target = ROOT / "outputs" / f"{self.name}_{job}"
+        if target.exists():
+            preserved = target.with_name(target.name + f"_interrupted_{time.time_ns()}")
+            target.rename(preserved)
+        target.mkdir()
+        try:
+            os.link(weight, target / "model.pth")
+        except OSError:
+            shutil.copy2(weight, target / "model.pth")
+        config = yaml.safe_load((source / "config.yaml").read_text())
+        config.update(checkpoint_epoch=epoch, completed_epochs=epoch, planned_epochs=config["epochs"],
+                      checkpoint_source_job=source_job, source_checkpoint_sha256=manifest["sha256"])
+        (target / "config.yaml").write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False))
+        shutil.copy2(source / "source.zip", target / "source.zip")
+        with (source / "train.csv").open(newline="") as stream:
+            reader = csv.DictReader(stream)
+            fields = reader.fieldnames
+            history = [r for r in reader if int(r["epoch"]) <= epoch]
+        if len(history) != epoch:
+            raise RuntimeError("中间checkpoint训练记录不完整")
+        with (target / "train.csv").open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(history)
+        provenance = {"at": now(), "source_job": source_job, "source_checkpoint": str(weight),
+                      "checkpoint_sha256": manifest["sha256"], "checkpoint_epoch": epoch, "additional_training_steps": 0}
+        atomic_json(target / "CHECKPOINT_IMPORTED.json", provenance)
+        self.state["jobs"][job] = {"completed": ["checkpoint_import"], "status": "prepared", "phase": "diagnostic1",
+            "seed": seed, "variant": arm["id"], "module": "none", **task, "model_dir": str(target), "source_job": source_job}
+        with (self.directory / "commands.jsonl").open("a") as stream:
+            stream.write(json.dumps({"job": job, "phase": "checkpoint_import", **provenance}) + "\n")
+        self.save()
+        return arm, job
+
+    def run_diagnostics(self):
+        config = self.config.get("diagnostics", {})
+        if not config.get("enabled"):
+            return
+        seed, epoch = config["seed"], config["prefix_epoch"]
+        if seed != self.config["screen_seed"]:
+            raise ValueError("诊断必须使用同seed的开发baseline")
+        for task in self.config["screen_tasks"]:
+            arm = {"id": "schedule3", "module": "none", "epochs": config["epochs"],
+                   "schedule_epochs": config["schedule_epochs"], "checkpoint_epochs": [epoch]}
+            source_job = job_name("diagnostic3", seed, arm, task)
+            if not self.train_and_evaluate("diagnostic3", seed, arm, task, baseline_phase="screen"):
+                raise RuntimeError("训练轨迹诊断失败")
+            prefix, derived_job = self.import_diagnostic_checkpoint(source_job, epoch, seed, task)
+            if not self.train_and_evaluate("diagnostic1", seed, prefix, task, baseline_phase="screen"):
+                raise RuntimeError("中间checkpoint评估失败")
+            for direction in ("D2S", "S2D"):
+                def result(phase, variant):
+                    return next(r for r in self.state["results"] if r["phase"] == phase and r["variant"] == variant and r["seed"] == seed and r["dataset"] == task["dataset"] and r["altitude"] == task["altitude"] and r["direction"] == direction)
+                a, b, c = result("screen", "baseline"), result("diagnostic1", prefix["id"]), result("diagnostic3", arm["id"])
+                item = {**task, "direction": direction, "seed": seed, "one_epoch_R1": a["recall@1"], "one_epoch_AP": a["mAP"],
+                        "schedule3_prefix_R1": b["recall@1"], "schedule3_prefix_AP": b["mAP"],
+                        "schedule3_last_R1": c["recall@1"], "schedule3_last_AP": c["mAP"],
+                        "schedule_delta_R1_pp": b["recall@1"] - a["recall@1"], "continue_delta_R1_pp": c["recall@1"] - b["recall@1"],
+                        "baseline_sha256": a["checkpoint_sha256"], "prefix_sha256": b["checkpoint_sha256"], "last_sha256": c["checkpoint_sha256"]}
+                records = self.state.setdefault("diagnostic_summary", [])
+                records[:] = [r for r in records if (r["dataset"], r["altitude"], r["direction"]) != (task["dataset"], task["altitude"], direction)]
+                records.append(item)
+            self.save()
+            # 中间权重已在派生任务完成双向评估并归档；只释放源目录的重复硬链接。
+            source = Path(self.state["jobs"][source_job]["model_dir"])
+            snapshot = source / f"model_epoch{epoch}.pth"
+            if snapshot.exists():
+                ready = json.loads((self.directory / "archive_ready" / f"{derived_job}.json").read_text())
+                if digest(ready["bundle"]) != ready["bundle_sha256"] or digest(snapshot) != self.state["jobs"][derived_job]["checkpoint_sha256"]:
+                    raise RuntimeError("诊断归档未核验，保留中间权重")
+                snapshot.unlink()
+                atomic_json(source / "CHECKPOINT_TRANSFERRED.json", {"at": now(), "epoch": epoch, "destination_job": derived_job, "checkpoint_sha256": ready["checkpoint_sha256"]})
+            self.prune(source_job)
+            self.prune(derived_job)
 
     def prune_screen(self, phase):
         ranking = self.selection([phase], list(self.arms))
@@ -379,10 +496,12 @@ class Campaign:
                         success = self.train_and_evaluate(phase, seed, arm, task)
                         if not success and arm["id"] == "baseline":
                             raise RuntimeError("同预算baseline失败，停止比较")
+                    if arm["id"] == "baseline":
+                        self.run_diagnostics()
                     self.prune_screen(phase)
             ranking = self.selection(["screen"], list(self.arms))
             self.state["screen_selection"] = ranking
-            shortlist = [r["variant"] for r in ranking if r["eligible"]][:self.config["confirm_top_k"]]
+            shortlist = list(self.arms) if self.selection_mode == "fixed_ablation" else [r["variant"] for r in ranking if r["eligible"]][:self.config["confirm_top_k"]]
             self.state["shortlist"] = shortlist
             self.save()
             if shortlist:
@@ -392,7 +511,7 @@ class Campaign:
                         if not success and arm["id"] == "baseline":
                             raise RuntimeError("复验baseline失败，停止晋级")
                 ranking = self.selection(["screen", "confirm"], shortlist)
-                finalists = [r["variant"] for r in ranking if r["eligible"]][:self.config["final_top_k"]]
+                finalists = list(self.arms) if self.selection_mode == "fixed_ablation" else [r["variant"] for r in ranking if r["eligible"]][:self.config["final_top_k"]]
             else:
                 ranking, finalists = [], []
             self.state.update(confirmation_selection=ranking, finalists=finalists)
@@ -433,11 +552,19 @@ def main():
     args = parser.parse_args()
     config = yaml.safe_load(Path(args.config).read_text())
     if args.plan:
+        fixed = config.get("selection_mode") == "fixed_ablation"
+        diagnostic_tasks = len(config["screen_tasks"]) if config.get("diagnostics", {}).get("enabled") else 0
+        screen = (len(config["arms"]) + 1) * len(config["screen_tasks"])
+        confirm = ((len(config["arms"]) if fixed else config["confirm_top_k"]) + 1) * len(config["screen_tasks"])
+        final_arms = (len(config["arms"]) if fixed else config["final_top_k"]) + 1
+        final = final_arms * len(config["final_tasks"]) * len(config["final_seeds"])
         print(json.dumps({"run": config["run"], "arms": len(config["arms"]),
-            "screen_trainings": (len(config["arms"]) + 1) * len(config["screen_tasks"]),
-            "maximum_confirmation_trainings": (config["confirm_top_k"] + 1) * len(config["screen_tasks"]),
-            "maximum_final_trainings": (config["final_top_k"] + 1) * len(config["final_tasks"]) * len(config["final_seeds"]),
-            "promotion": "development_only", "gpu_running": False}, indent=2))
+            "screen_trainings": screen, "maximum_confirmation_trainings": confirm, "maximum_final_trainings": final,
+            "diagnostic_trainings": diagnostic_tasks, "diagnostic_checkpoint_imports": diagnostic_tasks,
+            "maximum_trainings": screen + confirm + final + diagnostic_tasks,
+            "maximum_artifact_groups": screen + confirm + final + 2 * diagnostic_tasks,
+            "maximum_evaluations": (screen + confirm) * 2 + diagnostic_tasks * 4 + final_arms * len(config["final_seeds"]) * sum(2 if t["dataset"] == "U1652" else 4 for t in config["final_tasks"]),
+            "promotion": "preregistered_fixed_ablation" if fixed else "development_only", "gpu_running": False}, indent=2))
         return
     if args.hours is None or not 0 < args.hours <= 168:
         parser.error("执行必须显式指定0–168小时内的--hours预算；无默认无限运行")
@@ -461,7 +588,7 @@ def main():
             while not (campaign.directory / "local_archive_verified.json").exists() and time.monotonic() < wait_until:
                 time.sleep(min(30, max(0, wait_until - time.monotonic())))
             atomic_json(campaign.directory / "shutdown.json", {"at": now(), "reason": campaign.state["status"],
-                        "location": "server_data_disk_archives", "local_download_verified": False})
+                        "location": "server_data_disk_archives", "local_download_verified": (campaign.directory / "local_archive_verified.json").exists()})
             subprocess.run(["/bin/bash", "/usr/bin/shutdown"], check=True)
 
 

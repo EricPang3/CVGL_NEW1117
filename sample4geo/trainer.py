@@ -8,7 +8,8 @@ from tqdm import tqdm
 
 def cosine_scheduler(optimizer, batches_per_epoch, config):
     """与 S4G 的 HF cosine scheduler 相同；步数在地点唯一采样前确定。"""
-    total = batches_per_epoch * config["epochs"]
+    # 缺省仍完全沿用S4G；显式延长调度只用于训练轨迹诊断。
+    total = batches_per_epoch * config.get("schedule_epochs", config["epochs"])
     warmup = batches_per_epoch * config["warmup_epochs"]
 
     def factor(step):

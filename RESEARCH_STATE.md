@@ -68,3 +68,14 @@
 - 旧1epoch baseline的U1652两seed均值92.3894/94.5078，高于当前3epoch方案。只比较共同seed1/2，3epoch baseline的D2S分别下降2.1292/3.2334pp，平均-2.6813pp。20组共同seed任务的训练关键配置（除epoch）、清单与评估规则核对一致；epochs与对应调度长度是重点怀疑，尚未确定因果。下一步应在原1epoch配方下重新做匹配消融，不把相对弱基线的增益当成达到目标。
 - 现有正式矩阵缺少同预算普通共识/仅WT/普通卷积＋共识全套消融，不能证明组合收益来自WT本身。单seed筛查、开发集、测试集、不同epoch、不同图库均须分别报告。
 - 完整成果表results/review20261123/summary.md；全部714条明细all_results.csv；主协议均值/标准差/每seed胜负primary_comparison.csv；全图库三seed表three_seed_metrics.csv；20组同seed配方审计same_seed_recipe_audit.csv；完整性audit.json。此轮用户请求是复盘，不启动新GPU实验。
+
+## 2026-11-23 新授权与一轮固定消融（当前状态优先）
+
+- 用户要求“你认为接下来应当怎么修改，然后继续进行实验”，已实现新分支experiments/20261123-e1-ablation；不再受上一条“只复盘不训练”的任务范围限制。
+- 采用原1epoch/batch24/384配方：baseline、WT、精确可训练参数匹配DW、普通共识、可见共识、WT共识、DW共识。7组事先固定，负结果对照不删组，官方测试不调参；5任务×3seed，共105组正式训练。
+- 额外在U1652/SUES150m开发集做1轮调度、3轮调度真实第1轮快照和第3轮诊断，2次额外训练/2个导入checkpoint。全轮上限135次实际训练、137组产物、442项评估，24小时任务边界停止并验证归档后关机。具体见README_ABLATION.md。
+- 新增checkpoint_epoch/SHA与不可覆盖的原子快照；导入第1轮只拷贝真实前缀记录并记零额外训练。默认baseline路径、参数名、学习率公式保持兼容。
+- 本地完整53项CPU回归通过，包含真实小模型3epoch轨迹和独立开发评估、负结果对照晋级固定矩阵、归档/清理/本地接收/续跑；4种配置内特征图/目标在幅值1/32通过CPU有限梯度检查。不是4090预检或新精度。
+- 当前SSH connect.bjb1.seetacloud.com:43322仍Connection refused。已异步请用户开机并提供当前SSH，密码不得落盘。新队列尚未部署/启动，没有新PID/新分数，也不从本地准备时开始消耗24小时预算。
+- 空间准备：仅计划回收已校验本地完整归档与权重SHA的远程重复文件；本地baseline和服务器唯一副本保留。清单在outputs/ablation20261123_e1_preparation/remote_duplicate_plan.json，目前未在服务器执行。恢复SSH后须核对实时GPU、数据、空间与同源码，做完整7模型B24 CUDA预检，再启动新队列和本地接收。
+- 新结果目标目录outputs/ablation20261123_e1/、results/ablation20261123_e1/。额外导出diagnostics.csv、ablation_effects.csv、ablation_summary.csv，完整性/n/正负seed分列。旧714条审计结果和手写核心思想文件不覆盖。

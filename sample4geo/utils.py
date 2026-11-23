@@ -40,6 +40,14 @@ def save_json(data, path):
     Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
 
 
+def file_hash(path):
+    value = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            value.update(block)
+    return value.hexdigest()
+
+
 def records_hash(records):
     """相对路径和地点的指纹；跨机器一致，不代表图片内容哈希。"""
     manifest = sorted((r["key"], r["id"]) for r in records)
@@ -63,7 +71,8 @@ def snapshot_source(output, filename="source.zip"):
 def configure(config, args):
     for key in ("direction", "altitude", "data_root", "device", "workers", "img_size",
                 "epochs", "batch_size", "lr", "amp", "pretrained", "gallery_scope", "top_k", "seed", "augmentation", "module", "module_alpha", "freeze_backbone",
-                "auxiliary", "auxiliary_weight", "development_fraction", "development_seed", "eval_split", "gradient_checkpointing"):
+                "auxiliary", "auxiliary_weight", "development_fraction", "development_seed", "eval_split", "gradient_checkpointing",
+                "schedule_epochs", "checkpoint_epochs"):
         value = getattr(args, key, None)
         if value is not None:
             config[key] = value
@@ -93,6 +102,14 @@ def configure(config, args):
     config.setdefault("development_seed", 20261122)
     config.setdefault("eval_split", "test")
     config.setdefault("gradient_checkpointing", False)
+    if config.get("schedule_epochs") is None:
+        config["schedule_epochs"] = config["epochs"]
+    config.setdefault("checkpoint_epochs", [])
+    if not np.isfinite(config["schedule_epochs"]) or config["schedule_epochs"] < config["epochs"]:
+        raise ValueError("schedule_epochs必须有限且不小于实际训练epochs")
+    if not isinstance(config["checkpoint_epochs"], list) or any(type(e) is not int or not 1 <= e <= config["epochs"] for e in config["checkpoint_epochs"]):
+        raise ValueError("checkpoint_epochs必须是训练范围内的整数列表")
+    config["checkpoint_epochs"] = sorted(set(config["checkpoint_epochs"]))
     from .auxiliary import AUXILIARIES
     if config["auxiliary"] not in AUXILIARIES or not np.isfinite(config["auxiliary_weight"]) or config["auxiliary_weight"] < 0:
         raise ValueError("辅助目标或权重不合法")

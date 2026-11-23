@@ -1,0 +1,47 @@
+run: ablation20261123_e1
+selection_mode: fixed_ablation
+batch_size: 24
+img_size: 384
+workers: 4
+eval_batch_size: 64
+module_alpha: 0.1
+screen_epochs: 1
+final_epochs: 1
+screen_seed: 1
+confirmation_seed: 2
+final_seeds: [1, 2, 3]
+development_fraction: 0.2
+development_seed: 20261122
+minimum_gain_ap_pp: 0.2
+maximum_dataset_r1_drop_pp: 1.0
+confirm_top_k: 6
+final_top_k: 6
+minimum_free_gib: 3.0
+screen_keep_top_k: 2
+report_limit: 100
+# baseline权重受保护。候选仅保留seed1/U1652的两个核心方案，其他完整结果保留后清理。
+retain_final_candidates: [visible_consensus, wt_consensus]
+retain_final_candidate_tasks: [u1652]
+diagnostics:
+  enabled: true
+  seed: 1
+  epochs: 3
+  schedule_epochs: 3
+  prefix_epoch: 1
+screen_tasks:
+  - {dataset: U1652, altitude: null}
+  - {dataset: SUES200, altitude: 150}
+final_tasks:
+  - {dataset: U1652, altitude: null}
+  - {dataset: SUES200, altitude: 150}
+  - {dataset: SUES200, altitude: 200}
+  - {dataset: SUES200, altitude: 250}
+  - {dataset: SUES200, altitude: 300}
+# 全组事先固定；控制组即使开发集退步也保留，正式测试不决定分组或超参。
+arms:
+  - {id: wtconv, module: wtconv, source: original_hypotheses, role: convolution_control}
+  - {id: dwconv_matched, module: dwconv_matched, source: original_hypotheses, role: parameter_matched_control}
+  - {id: consensus, module: none, auxiliary: consensus, auxiliary_weight: 0.5, source: geocom, role: objective_control}
+  - {id: visible_consensus, module: none, auxiliary: visible_consensus, auxiliary_weight: 0.5, source: mgs2, role: candidate}
+  - {id: wt_consensus, module: wtconv, auxiliary: consensus, auxiliary_weight: 0.5, source: geocom, role: candidate}
+  - {id: dw_consensus, module: dwconv_matched, auxiliary: consensus, auxiliary_weight: 0.5, source: original_hypotheses, role: matched_control}

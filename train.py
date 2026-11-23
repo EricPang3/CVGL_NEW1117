@@ -5,6 +5,9 @@ import csv
 import math
 import platform
 import hashlib
+import json
+import os
+import shutil
 from datetime import datetime
 from importlib.metadata import version
 
@@ -15,7 +18,29 @@ from sample4geo.dataset import U1652DatasetTrain, UniqueBatchSampler, build_reco
 from sample4geo.loss import InfoNCE
 from sample4geo.model import MODEL_NAME, TimmModel, load_model_state, module_alpha_metadata
 from sample4geo.trainer import cosine_scheduler, train_epoch
-from sample4geo.utils import ROOT, configure, experiment_config, load_weights, new_output, records_hash, save_config, setup, snapshot_source
+from sample4geo.utils import ROOT, configure, experiment_config, file_hash, load_weights, new_output, records_hash, save_config, save_json, setup, snapshot_source
+
+
+def save_checkpoint(model, config, epoch, output):
+    target = output / f"model_epoch{epoch}.pth"
+    if epoch in config.get("checkpoint_epochs", []) and target.exists():
+        raise RuntimeError(f"拒绝覆盖保留的中间权重：{target}")
+    temporary = output / "model.tmp"
+    torch.save({"model": model.state_dict(), "config": {**config, "checkpoint_epoch": epoch}, "epoch": epoch}, temporary)
+    temporary.replace(output / "model.pth")
+    if epoch in config.get("checkpoint_epochs", []):
+        try:
+            os.link(output / "model.pth", target)
+            storage = "hardlink"
+        except OSError:
+            shutil.copy2(output / "model.pth", target)
+            storage = "copy"
+        manifest_file = output / "checkpoint_epochs.json"
+        manifest = json.loads(manifest_file.read_text()) if manifest_file.exists() else {}
+        manifest[str(epoch)] = {"file": target.name, "epoch": epoch, "sha256": file_hash(target), "storage": storage}
+        manifest_tmp = manifest_file.with_suffix(".tmp")
+        save_json(manifest, manifest_tmp)
+        manifest_tmp.replace(manifest_file)
 
 
 def main():
@@ -30,6 +55,8 @@ def main():
     for key in ("epochs", "batch-size", "workers", "img-size", "seed"):
         parser.add_argument(f"--{key}", type=int)
     parser.add_argument("--lr", type=float)
+    parser.add_argument("--schedule-epochs", type=float, help="默认等于epochs；显式延长仅用于调度轨迹诊断")
+    parser.add_argument("--checkpoint-epochs", type=int, nargs="+", help="额外保留指定epoch的真实权重")
     parser.add_argument("--augmentation", choices=["s4g", "camp"])
     parser.add_argument("--module", help="none 或模块实验 ID")
     parser.add_argument("--module-alpha", type=float)
@@ -113,9 +140,7 @@ def main():
             row = train_epoch(model, loader, optimizer, criterion, scaler, scheduler, config, epoch, device)
             writer.writerow(row)
             stream.flush()
-            temporary = output / "model.tmp"
-            torch.save({"model": model.state_dict(), "config": config, "epoch": epoch}, temporary)
-            temporary.replace(output / "model.pth")
+            save_checkpoint(model, config, epoch, output)
             print(f'Epoch {epoch}: loss={row["loss"]:.4f}, pairs={row["pairs"]}, dropped={row["dropped_pairs"]}')
     print(f"训练完成。评估：python evaluate.py --checkpoint {output / 'model.pth'}")
 

@@ -1,6 +1,7 @@
 """新研究流程的边界：开发集无地点泄漏、训练期辅助独立推理、只凭开发集晋级、完整归档后清理。"""
 
 import json
+from hashlib import sha256
 import random
 import shutil
 import subprocess
@@ -206,6 +207,12 @@ class ResearchTests(unittest.TestCase):
                     Campaign(path, root, 2)
 
     def test_campaign_all_stages_archives_scopes_resume_and_local_tables(self):
+        self.exercise_campaign()
+
+    def test_fixed_ablation_keeps_negative_controls_and_imports_real_prefix(self):
+        self.exercise_campaign(fixed=True)
+
+    def exercise_campaign(self, fixed=False):
         """模拟昂贵训练命令，但真实调用指标、对比、离线报告、归档、清理和导表。"""
         from report import build_report
         from sample4geo.evaluate.metrics import score_query, summarize
@@ -218,6 +225,10 @@ class ResearchTests(unittest.TestCase):
                 arms=[{"id": "good", "module": "none"}, {"id": "bad", "module": "none"}],
                 screen_tasks=[{"dataset": "U1652", "altitude": None}],
                 final_tasks=[{"dataset": "U1652", "altitude": None}, {"dataset": "SUES200", "altitude": 150}])
+            if fixed:
+                config.update(selection_mode="fixed_ablation", screen_epochs=1, final_epochs=1,
+                    diagnostics={"enabled": True, "seed": 1, "epochs": 3, "schedule_epochs": 3, "prefix_epoch": 1},
+                    retain_final_candidates=["good"], retain_final_candidate_tasks=["u1652"])
             path = root / "campaign.yaml"
             path.write_text(yaml.safe_dump(config))
             for name in ("a", "b"):
@@ -231,8 +242,14 @@ class ResearchTests(unittest.TestCase):
                     output = root / "outputs" / get("--name")
                     output.mkdir()
                     (output / "model.pth").write_bytes(output.name.encode())
-                    (output / "config.yaml").write_text("dataset: U1652\n")
-                    (output / "train.csv").write_text("epoch,seconds,amp_skipped_steps,peak_gpu_mb\n1,1,0,20000\n")
+                    epochs = int(get("--epochs"))
+                    schedule = float(get("--schedule-epochs")) if "--schedule-epochs" in command else epochs
+                    (output / "config.yaml").write_text(yaml.safe_dump({"dataset": "U1652", "epochs": epochs, "schedule_epochs": schedule}))
+                    (output / "train.csv").write_text("epoch,seconds,amp_skipped_steps,peak_gpu_mb\n" + "".join(f"{e},1,0,20000\n" for e in range(1, epochs + 1)))
+                    if "--checkpoint-epochs" in command:
+                        prefix = output / "model_epoch1.pth"
+                        prefix.write_bytes(b"first epoch of longer schedule")
+                        atomic_json(output / "checkpoint_epochs.json", {"1": {"file": prefix.name, "epoch": 1, "sha256": digest(prefix)}})
                     with zipfile.ZipFile(output / "source.zip", "w") as archive:
                         archive.writestr("source.py", "# simulated expensive training\n")
                 elif command[1] == "evaluate.py":
@@ -271,10 +288,22 @@ class ResearchTests(unittest.TestCase):
                 with patch("scripts.research_campaign.subprocess.run", side_effect=fake_run):
                     campaign.execute()
                 self.assertEqual(campaign.state["status"], "complete", campaign.state)
-                self.assertEqual(campaign.state["finalists"], ["good"])
-                self.assertEqual(len(campaign.state["jobs"]), 13)
-                self.assertEqual(len(campaign.state["results"]), 34)
-                self.assertEqual(len(list((campaign.directory / "archive_ready").glob("*.json"))), 13)
+                self.assertEqual(campaign.state["finalists"], ["good", "bad"] if fixed else ["good"])
+                self.assertEqual(len(campaign.state["jobs"]), 20 if fixed else 13)
+                self.assertEqual(len(campaign.state["results"]), 52 if fixed else 34)
+                self.assertEqual(len(list((campaign.directory / "archive_ready").glob("*.json"))), 20 if fixed else 13)
+                if fixed:
+                    self.assertTrue(all(not r["eligible"] for r in campaign.state["confirmation_selection"] if r["variant"] == "bad"))
+                    imported = campaign.state["jobs"]["diagnostic1_s1_schedule3_prefix_u1652"]
+                    self.assertIn("checkpoint_import", imported["completed"])
+                    self.assertNotIn("train", imported["completed"])
+                    row = next(r for r in campaign.state["results"] if r["artifact_job"] == "diagnostic1_s1_schedule3_prefix_u1652")
+                    self.assertEqual((row["checkpoint_epoch"], row["epochs"], row["schedule_epochs"], row["additional_training_seconds"]), (1, 1, 3, 0))
+                    self.assertEqual(row["checkpoint_sha256"], sha256(b"first epoch of longer schedule").hexdigest())
+                    self.assertEqual(len(campaign.state["diagnostic_summary"]), 2)
+                    self.assertFalse((root / "outputs/test_diagnostic3_s1_schedule3_u1652/model_epoch1.pth").exists())
+                    self.assertFalse((root / "outputs/test_final_s1_bad_u1652/model.pth").exists())
+                    self.assertFalse((root / "outputs/test_final_s1_good_sues200_150/model.pth").exists())
                 second = root / "outputs/test_final_s2_good_u1652/model.pth"
                 self.assertFalse(second.exists())
                 self.assertTrue((root / "outputs/test_final_s2_baseline_u1652/model.pth").exists())
@@ -321,7 +350,7 @@ class ResearchTests(unittest.TestCase):
                 self.assertFalse((artifacts / "final_s2_good_u1652/model.pth").exists())
                 manifest = json.loads((local / "outputs/test/archive_manifest.json").read_text())
                 self.assertEqual(manifest["status"], "complete")
-                self.assertEqual(len(manifest["artifacts"]), 13)
+                self.assertEqual(len(manifest["artifacts"]), 20 if fixed else 13)
                 item = manifest["artifacts"]["final_s1_good_u1652"]
                 self.assertEqual(item["checkpoint_retention_policy_sha256"], resumed.state["config_sha256"])
                 self.assertEqual(item["checkpoint_retention_code_sha256"], resumed.state["code_sha256"])
