@@ -1,5 +1,7 @@
 # CVGL_NEW：AI 维护契约
 
+> 2026-11-23完整复盘：research20261122已于北京时间00:04:05完成87/87组、246项评估，3seed正式矩阵45/45完成，87包已本地归档。全部714条当前有效指标、321个结果包及第二轮15份权重核验通过。总表与完整明细在results/review20261123/summary.md和all_results.csv。共识在部分任务有同配方配对增益，但3epoch配方弱于旧1epoch，尚未达到统一超越基线/强方法目标。以下启动信息为历史记录；当前不应重启旧队列。
+
 > 2026-11-22最新任务：用户再次要求继续，research20261122已于北京时间12:20:47启动，采用推荐24小时上限，次日12:20:47后不启动新任务，当前任务归档后关机。新服务器43322，本地接收已启动。续接先读AGENTS.md与RESEARCH_STATE.md，实时状态看outputs/research20261122/state.json。原baseline契约只约束显式none路径；候选配置configs/research_campaign.yaml，来源configs/research_sources.yaml。不要再将“预算待确认”当作阻塞。
 
 > 2026-11-20：用户授权33模块完整矩阵。先读不可修改的《核心思想（AI必读）.md》、模块目录和EXPERIMENT_LOG.md。以下baseline契约适用于module=none；显式模块实验允许目录中的共享适配头，不能删除原GAP旁路。队列配置configs/module_suite.yaml，脚本scripts/module_suite.py，本地接收scripts/collect_experiments.py。真实完成状态看outputs/modules20261120/state.json，不要把已排队写成已完成。

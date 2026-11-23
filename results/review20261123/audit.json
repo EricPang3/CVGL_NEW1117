@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "counts": {
+    "old_metrics_checked": 468,
+    "research_metrics_checked": 246,
+    "three_seed_aggregates_checked": 54,
+    "verified_result_bundles": 321,
+    "verified_bundle_bytes": 11758542229,
+    "verified_research_weights": 15,
+    "current_evaluation_records": 714,
+    "research_development_evaluations": 84,
+    "research_test_evaluations": 162,
+    "separate_legacy_records": 24
+  },
+  "errors": [],
+  "notes": [
+    "R1 and AP percentages were independently checked against metrics.json.",
+    "All new paired deltas and protocol/manifest matches checked.",
+    "All three-seed means and sample standard deviations recalculated.",
+    "All current result bundles SHA256 checked; deleted weights are not required."
+  ],
+  "checked_at": "2026-11-23T09:28:36.797895+08:00",
+  "same_seed_recipe_checks": 20,
+  "recipe_non_epoch_config_differences": [],
+  "development_model_configs_checked": 42,
+  "final_model_configs_checked": 45,
+  "training_configuration_errors": []
+}
